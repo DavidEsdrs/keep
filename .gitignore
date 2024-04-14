@@ -1,3 +1,6 @@
 .vscode
 *.bin
 *.exe
+*.kps
+*.kpsinfo
+*.txt
