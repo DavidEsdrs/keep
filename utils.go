@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/fatih/color"
@@ -79,35 +78,16 @@ func parseTextAsNote(text string) note {
 		showError("invalid color", 8)
 	}
 
+	var textAsBytes [100]byte
+
 	innerText := tokensText[3]
 
-	return note{
-		id:        id,
-		createdAt: date,
-		text:      innerText,
-		color:     colorAttribute,
-	}
-}
+	copy(textAsBytes[:], []byte(innerText))
 
-func colorFromString(c string) (color.Attribute, error) {
-	switch strings.ToLower(c) {
-	case "red":
-		return color.FgRed, nil
-	case "green":
-		return color.FgGreen, nil
-	case "blue":
-		return color.FgBlue, nil
-	case "yellow":
-		return color.FgYellow, nil
-	case "black":
-		return color.FgBlack, nil
-	case "white":
-		return color.FgWhite, nil
-	case "cyan":
-		return color.FgCyan, nil
-	case "magenta":
-		return color.FgMagenta, nil
-	default:
-		return color.Attribute(0), fmt.Errorf("cor não reconhecida")
+	return note{
+		Id:        id,
+		CreatedAt: date,
+		Text:      textAsBytes,
+		Color:     int8(colorAttribute),
 	}
 }

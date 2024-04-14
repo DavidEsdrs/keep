@@ -1,30 +1,37 @@
 package main
 
 import (
-	"bufio"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/DavidEsdrs/godeline"
 	editnode "github.com/DavidEsdrs/godeline/edit-node"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
+// errors
 var (
 	ErrUnexEOF = errors.New("keeps: unexpected EOF")
 )
 
+// global
 var (
 	info *NotesInfo
 )
 
 func init() {
-	err := createInfoFile()
+	err := createStoreFile()
+
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	err = createInfoFile()
 
 	if err != nil {
 		log.Fatal(err.Error())
@@ -59,53 +66,10 @@ func main() {
 	rootCmd.Execute()
 }
 
-func createInfoFile() error {
-	if doesFileExists("info.bin") {
-		return readFile()
-	}
-
-	return createFile()
-}
-
 func doesFileExists(filePath string) bool {
 	_, error := os.Stat(filePath)
 	//return !os.IsNotExist(err)
 	return !errors.Is(error, os.ErrNotExist)
-}
-
-type note struct {
-	id        int64
-	text      string
-	color     color.Attribute
-	createdAt int64
-}
-
-func (n note) show() {
-	c := color.New(n.color).Add(color.Bold)
-
-	t := time.Unix(n.createdAt/1000, 0)
-
-	blue := color.New(color.BgHiBlue).Add(color.Bold)
-
-	blue.DisableColor()
-
-	blue.Print(fmt.Sprint(n.id) + " ~ ")
-
-	blue.EnableColor()
-
-	now := time.Now()
-
-	if t.Year() == now.Year() && t.Month() == now.Month() && t.Day() == now.Day() {
-		blue.Printf(" %v ", t.Local().Format(time.Kitchen))
-	} else {
-		blue.Printf(" %v ", t.Local().Format("01/02/2006"))
-	}
-
-	blue.DisableColor()
-	blue.Print(" - ")
-	blue.EnableColor()
-	c.Print(n.text)
-	c.Println()
 }
 
 type Choose int
@@ -118,7 +82,11 @@ const (
 	Delete
 )
 
-const filename string = "keeps.txt"
+const (
+	filename     string = "keeps.kps"
+	infoFilename string = "info.kpsinfo"
+	structSize   int64  = 117
+)
 
 var processor *godeline.Processor
 
@@ -135,19 +103,20 @@ func create() *cobra.Command {
 			}
 			defer f.Close()
 
-			w := bufio.NewWriter(f)
-
 			for _, note := range args {
 				if len(note) <= 100 {
 					note = generateNote(note)
-					w.WriteString(note)
+					n := parseTextAsNote(note)
+					err := binary.Write(f, binary.BigEndian, &n)
+					if err != nil {
+						panic(err.Error())
+					}
+					info.Add()
 				} else {
 					showError("the length of the note is bigger than allowed!", 10)
 				}
 			}
 
-			w.Flush()
-			info.Add()
 			info.Save()
 		},
 	}
@@ -165,14 +134,12 @@ func readAll() *cobra.Command {
 			}
 			defer f.Close()
 
-			s := bufio.NewScanner(f)
-
 			isIncreasing, _ := cmd.Flags().GetBool("inc")
 
 			if isIncreasing {
-				showIncreasingOrder(s)
+				showIncreasingOrder(f)
 			} else {
-				showDecreasingOrder(s)
+				showDecreasingOrder(f)
 			}
 
 			fmt.Printf("%v notes\n", info.NotesQuant)
@@ -180,25 +147,44 @@ func readAll() *cobra.Command {
 	}
 }
 
-func showIncreasingOrder(s *bufio.Scanner) {
-	for s.Scan() {
-		text := s.Text()
-		note := parseTextAsNote(text)
-		note.show()
+func showIncreasingOrder(f *os.File) {
+	var n note
+
+	for {
+		err := binary.Read(f, binary.BigEndian, &n)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			} else {
+				panic("keep: error while reading binary file")
+			}
+		}
+		if n.Id != 0 {
+			n.show()
+		}
 	}
 }
 
-func showDecreasingOrder(s *bufio.Scanner) {
+func showDecreasingOrder(f *os.File) {
 	var notes []note
+	var n note
 
-	for s.Scan() {
-		text := s.Text()
-		note := parseTextAsNote(text)
-		notes = append(notes, note)
+	for {
+		err := binary.Read(f, binary.BigEndian, &n)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			} else {
+				panic("keep: error while reading binary file. error -" + err.Error())
+			}
+		}
+		notes = append(notes, n)
 	}
 
 	for i := len(notes) - 1; i >= 0; i-- {
-		note.show(notes[i])
+		if notes[i].Id != 0 {
+			note.show(notes[i])
+		}
 	}
 }
 
@@ -209,7 +195,7 @@ func delete() *cobra.Command {
 		Short:   "deletes a given note",
 		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			file, err := os.OpenFile(filename, os.O_RDWR, 0644)
+			file, err := os.OpenFile(filename, os.O_RDWR, 0666)
 			if err != nil {
 				panic(err)
 			}
@@ -217,38 +203,23 @@ func delete() *cobra.Command {
 
 			id, _ := strconv.ParseInt(args[0], 10, 64)
 
-			s := bufio.NewScanner(file)
-			w := bufio.NewWriter(file)
-
-			var lines []string
-
-			for s.Scan() {
-				line := s.Text()
-
-				note := parseTextAsNote(line)
-
-				if note.id != id {
-					lines = append(lines, line)
-				}
+			if id > int64(info.NotesQuant) {
+				showError("invalid id!", 4)
 			}
 
-			err = file.Truncate(0) // cleans the file
+			positionToRemove := (id - 1) * structSize
+
+			_, err = file.Seek(positionToRemove, io.SeekStart)
 
 			if err != nil {
-				panic("keeps: error while truncating file! error - " + err.Error())
+				panic(err)
 			}
 
-			_, err = file.Seek(0, 0)
+			err = binary.Write(file, binary.BigEndian, note{}) // we override the line with a empty struct
 
 			if err != nil {
-				panic("keeps: error while seeking file! error - " + err.Error())
+				panic(err)
 			}
-
-			for _, l := range lines {
-				w.WriteString(fmt.Sprintf("%v\n", l))
-			}
-
-			w.Flush()
 
 			info.Remove()
 			info.Save()
@@ -270,17 +241,18 @@ func readSingle() *cobra.Command {
 
 			id, _ := strconv.ParseInt(args[0], 10, 64)
 
-			s := bufio.NewScanner(file)
+			if _, err := file.Seek((id-1)*structSize, io.SeekStart); err != nil {
+				panic("invalid seeking! error - " + err.Error())
+			}
 
-			for s.Scan() {
-				line := s.Text()
+			var n note
 
-				note := parseTextAsNote(line)
+			if err := binary.Read(file, binary.BigEndian, &n); err != nil {
+				panic("keep: error while reading binary file")
+			}
 
-				if note.id == id {
-					note.show()
-					break
-				}
+			if n.Id == id { // assert
+				n.show()
 			}
 		},
 	}
