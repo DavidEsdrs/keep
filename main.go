@@ -64,6 +64,7 @@ func main() {
 	// create a new note
 	rootCmd := create()
 
+	// notes commands
 	rootCmd.AddCommand(readAll())
 	rootCmd.AddCommand(delete())
 	rootCmd.AddCommand(readSingle())
@@ -191,16 +192,12 @@ func delete() *cobra.Command {
 
 			id, _ := strconv.ParseInt(args[0], 10, 64)
 
-			if id > int64(info.NotesQuant) {
-				showError("invalid id!", 4)
-			}
-
 			positionToRemove := (id - 1) * structSize
 
 			_, err = file.Seek(positionToRemove, io.SeekStart)
 
 			if err != nil {
-				panic(err)
+				showError("can't remove. is it a valid ID?", 11)
 			}
 
 			err = binary.Write(file, binary.BigEndian, &note{}) // we override the line with a empty struct
