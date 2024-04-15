@@ -7,10 +7,9 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 
-	"github.com/DavidEsdrs/godeline"
-	editnode "github.com/DavidEsdrs/godeline/edit-node"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +23,28 @@ var (
 	info *NotesInfo
 )
 
+type Choose int
+
+const (
+	Unknown Choose = iota
+	Create
+	ReadSingle
+	ReadAll
+	Delete
+)
+
+var (
+	filename     string = "keeps.kps"
+	infoFilename string = "info.kpsinfo"
+	structSize   int64  = int64(binary.Size(note{}))
+)
+
 func init() {
+	ex, _ := os.Executable()
+	ex = filepath.Dir(ex)
+	filename = fmt.Sprintf("%v\\%v", ex, filename)
+	infoFilename = fmt.Sprintf("%v\\%v", ex, infoFilename)
+
 	err := createStoreFile()
 
 	if err != nil {
@@ -36,19 +56,6 @@ func init() {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-
-	t := editnode.NewEditTree()
-
-	t.AddDelimiterType("{", "}")
-	t.AddDelimiterType("[", "]")
-	t.AddDelimiterType("(", ")")
-	t.AddDelimiterType("`", "`")
-
-	p := godeline.NewProcessor(&t, 1<<12)
-
-	p.Sanitize()
-
-	processor = &p
 }
 
 func main() {
@@ -66,29 +73,11 @@ func main() {
 	rootCmd.Execute()
 }
 
-func doesFileExists(filePath string) bool {
-	_, error := os.Stat(filePath)
+func doesFileExists(filename string) bool {
+	_, error := os.Stat(filename)
 	//return !os.IsNotExist(err)
 	return !errors.Is(error, os.ErrNotExist)
 }
-
-type Choose int
-
-const (
-	Unknown Choose = iota
-	Create
-	ReadSingle
-	ReadAll
-	Delete
-)
-
-const (
-	filename     string = "keeps.kps"
-	infoFilename string = "info.kpsinfo"
-	structSize   int64  = 117
-)
-
-var processor *godeline.Processor
 
 func create() *cobra.Command {
 	return &cobra.Command{
@@ -105,8 +94,7 @@ func create() *cobra.Command {
 
 			for _, note := range args {
 				if len(note) <= 100 {
-					note = generateNote(note)
-					n := parseTextAsNote(note)
+					n := generateNote(note)
 					err := binary.Write(f, binary.BigEndian, &n)
 					if err != nil {
 						panic(err.Error())
@@ -215,7 +203,7 @@ func delete() *cobra.Command {
 				panic(err)
 			}
 
-			err = binary.Write(file, binary.BigEndian, note{}) // we override the line with a empty struct
+			err = binary.Write(file, binary.BigEndian, &note{}) // we override the line with a empty struct
 
 			if err != nil {
 				panic(err)

@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/fatih/color"
@@ -43,51 +41,18 @@ func showError(text string, errCode int) {
 }
 
 // generates a note with its date and color
-func generateNote(text string) string {
+func generateNote(text string) note {
 	now := time.Now().UnixMilli()
 	color := randomColor()
 	id := info.NotesQuant + 1
-	return fmt.Sprintf("[%v]{%v}(%v)`%v`\n", id, now, color, text)
-}
-
-func parseTextAsNote(text string) note {
-	result, err := processor.Tokenize(text)
-	if err != nil {
-		showError(err.Error(), 9)
-	}
-	tokens := result.Tokens()
-
-	var tokensText [4]string
-
-	for i, t := range tokens {
-		tokensText[i] = t.InnerText
-	}
-
-	id, _ := strconv.ParseInt(tokensText[0], 10, 64)
-
-	date, err := strconv.ParseInt(tokensText[1], 10, 64)
-
-	if err != nil {
-		showError("invalid date", 8)
-	}
-
-	colorNumber, _ := strconv.Atoi(tokensText[2])
-	colorAttribute := color.Attribute(colorNumber)
-
-	if err != nil {
-		showError("invalid color", 8)
-	}
 
 	var textAsBytes [100]byte
-
-	innerText := tokensText[3]
-
-	copy(textAsBytes[:], []byte(innerText))
+	copy(textAsBytes[:], []byte(text))
 
 	return note{
-		Id:        id,
-		CreatedAt: date,
+		Id:        int64(id),
 		Text:      textAsBytes,
-		Color:     int8(colorAttribute),
+		CreatedAt: now,
+		Color:     int8(color),
 	}
 }
