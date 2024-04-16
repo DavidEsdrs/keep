@@ -3,7 +3,10 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"time"
 
@@ -99,21 +102,9 @@ func descGroup() *cobra.Command {
 		Short: "describes the group",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			name := args[0]
-			fileName := name + ".kps"
-			fileName, err := fixPath(fileName)
-
+			f, err := getFileForGroup(args[0], os.O_RDONLY, 0600)
 			if err != nil {
-				panic("invalid name for file!")
-			}
-
-			if !doesFileExists(fileName) {
-				showError("there is no group with given name", 11)
-			}
-
-			f, err := os.OpenFile(fileName, os.O_RDONLY, 0600)
-			if err != nil {
-				panic("can't open file")
+				showError(err.Error(), 7)
 			}
 			defer f.Close()
 
@@ -126,6 +117,103 @@ func descGroup() *cobra.Command {
 			}
 
 			g.show()
+		},
+	}
+}
+
+func createNoteInGroup() *cobra.Command {
+	return &cobra.Command{
+		Use:   "add [group] [note]",
+		Short: "add a note to a group",
+		Args:  cobra.ExactArgs(2),
+		Run: func(cmd *cobra.Command, args []string) {
+			file, err := getFileForGroup(args[0], os.O_RDWR, 0666)
+			if err != nil {
+				showError(err.Error(), 7)
+			}
+			defer file.Close()
+
+			var g group
+
+			if err := binary.Read(file, binary.BigEndian, &g); err != nil {
+				showError(err.Error(), 12)
+			}
+
+			// how many to skip: size(group) + size(note) * (how many notes already saved)
+			skip := int64(binary.Size(&g)) + (int64(binary.Size(&note{})) * int64(g.Size))
+
+			if _, err := file.Seek(skip, 0); err != nil {
+				showError(err.Error(), 12)
+			}
+
+			n := generateNoteForGroup(args[1], g)
+
+			if err := binary.Write(file, binary.BigEndian, &n); err != nil {
+				panic(err.Error())
+			}
+
+			// back to file header
+			if _, err := file.Seek(0, 0); err != nil {
+				panic(err.Error())
+			}
+
+			g.Size++
+
+			if err := binary.Write(file, binary.BigEndian, &g); err != nil {
+				panic(err.Error())
+			}
+		},
+	}
+}
+
+func getFileForGroup(groupName string, flag int, mode fs.FileMode) (*os.File, error) {
+	fileName := groupName + ".kps"
+	fileName, err := fixPath(fileName)
+
+	if err != nil {
+		return nil, fmt.Errorf("invalid name for file")
+	}
+
+	if !doesFileExists(fileName) {
+		return nil, fmt.Errorf("there is no group with given name")
+	}
+
+	f, err := os.OpenFile(fileName, flag, mode)
+	return f, err
+}
+
+func readNotesInGroup() *cobra.Command {
+	return &cobra.Command{
+		Use:     "all [name]",
+		Short:   "reads all notes from group with [name]",
+		Aliases: []string{"read"},
+		Args:    cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			file, err := getFileForGroup(args[0], os.O_RDONLY, 0600)
+			if err != nil {
+				showError(err.Error(), 7)
+			}
+			defer file.Close()
+
+			if _, err := file.Seek(int64(binary.Size(&group{})), 0); err != nil {
+				showError(err.Error(), 12)
+			}
+
+			var n note
+
+			for {
+				err := binary.Read(file, binary.BigEndian, &n)
+				if err != nil {
+					if errors.Is(err, io.EOF) {
+						break
+					} else {
+						panic("keep: error while reading binary file")
+					}
+				}
+				if n.Id != 0 {
+					n.show()
+				}
+			}
 		},
 	}
 }

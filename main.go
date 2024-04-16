@@ -84,6 +84,8 @@ func main() {
 
 	rootCmd.AddCommand(group)
 	group.AddCommand(descGroup())
+	group.AddCommand(createNoteInGroup())
+	group.AddCommand(readNotesInGroup())
 
 	rootCmd.PersistentFlags().Bool("inc", false, "Show the notes in decreasing order")
 
