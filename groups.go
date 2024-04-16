@@ -70,7 +70,13 @@ func createGroup() *cobra.Command {
 
 			copy(g.Filename[:], fullName)
 
-			f, err := os.OpenFile(name+".kps", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+			fileName, err := fixPath(name + ".kps")
+
+			if err != nil {
+				panic(err.Error())
+			}
+
+			f, err := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 			if err != nil {
 				panic("error while opening file " + err.Error())
 			}
@@ -95,6 +101,11 @@ func descGroup() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			name := args[0]
 			fileName := name + ".kps"
+			fileName, err := fixPath(fileName)
+
+			if err != nil {
+				panic("invalid name for file!")
+			}
 
 			if !doesFileExists(fileName) {
 				showError("there is no group with given name", 11)

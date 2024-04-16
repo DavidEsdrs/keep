@@ -2,8 +2,10 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/fatih/color"
@@ -62,4 +64,21 @@ func generateNote(text string) note {
 func doesFileExists(filename string) bool {
 	_, error := os.Stat(filename)
 	return !errors.Is(error, os.ErrNotExist)
+}
+
+// fixPath fixes a path depending on mode (development or not)
+func fixPath(path string) (string, error) {
+	if IsProduction {
+		ex, err := os.Executable()
+		if err != nil {
+			return "", err
+		}
+		ex, err = filepath.EvalSymlinks(ex) //
+		if err != nil {
+			return "", err
+		}
+		ex = filepath.Dir(ex)
+		return fmt.Sprintf("%v\\%v", ex, filename), nil
+	}
+	return path, nil
 }
