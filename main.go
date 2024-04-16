@@ -39,10 +39,16 @@ var (
 	structSize   int64  = int64(binary.Size(note{}))
 )
 
+var (
+	IsProduction bool
+)
+
 func init() {
 	env := os.Getenv("ENV")
 
-	if env == "production" {
+	IsProduction = env == "production"
+
+	if IsProduction {
 		ex, _ := os.Executable()
 		ex = filepath.Dir(ex)
 		filename = fmt.Sprintf("%v\\%v", ex, filename)
