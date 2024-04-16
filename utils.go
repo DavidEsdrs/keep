@@ -60,6 +60,23 @@ func generateNote(text string) note {
 	}
 }
 
+// generates a note with its date and color to a group
+func generateNoteForGroup(text string, g group) note {
+	now := time.Now().UnixMilli()
+	color := randomColor()
+	id := g.Size + 1
+
+	var textAsBytes [100]byte
+	copy(textAsBytes[:], []byte(text))
+
+	return note{
+		Id:        int64(id),
+		Text:      textAsBytes,
+		CreatedAt: now,
+		Color:     int8(color),
+	}
+}
+
 // returns if file with "filename" exists
 func doesFileExists(filename string) bool {
 	_, error := os.Stat(filename)
