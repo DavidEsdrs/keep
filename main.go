@@ -74,12 +74,6 @@ func main() {
 	rootCmd.Execute()
 }
 
-func doesFileExists(filename string) bool {
-	_, error := os.Stat(filename)
-	//return !os.IsNotExist(err)
-	return !errors.Is(error, os.ErrNotExist)
-}
-
 func create() *cobra.Command {
 	return &cobra.Command{
 		Use:     "[input]",

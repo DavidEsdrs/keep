@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"math/rand"
 	"os"
 	"time"
@@ -55,4 +56,10 @@ func generateNote(text string) note {
 		CreatedAt: now,
 		Color:     int8(color),
 	}
+}
+
+// returns if file with "filename" exists
+func doesFileExists(filename string) bool {
+	_, error := os.Stat(filename)
+	return !errors.Is(error, os.ErrNotExist)
 }
