@@ -40,10 +40,14 @@ var (
 )
 
 func init() {
-	ex, _ := os.Executable()
-	ex = filepath.Dir(ex)
-	filename = fmt.Sprintf("%v\\%v", ex, filename)
-	infoFilename = fmt.Sprintf("%v\\%v", ex, infoFilename)
+	env := os.Getenv("ENV")
+
+	if env == "production" {
+		ex, _ := os.Executable()
+		ex = filepath.Dir(ex)
+		filename = fmt.Sprintf("%v\\%v", ex, filename)
+		infoFilename = fmt.Sprintf("%v\\%v", ex, infoFilename)
+	}
 
 	err := createStoreFile()
 
