@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -102,7 +103,7 @@ func descGroup() *cobra.Command {
 		Short: "describes the group",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			f, err := getFileForGroup(args[0], os.O_RDONLY, 0600)
+			f, err := getFileForGroup(args[0], os.O_RDONLY, 0600, false)
 			if err != nil {
 				showError(err.Error(), 7)
 			}
@@ -127,7 +128,7 @@ func createNoteInGroup() *cobra.Command {
 		Short: "add a note to a group",
 		Args:  cobra.ExactArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
-			file, err := getFileForGroup(args[0], os.O_RDWR, 0666)
+			file, err := getFileForGroup(args[0], os.O_RDWR, 0666, false)
 			if err != nil {
 				showError(err.Error(), 7)
 			}
@@ -166,7 +167,7 @@ func createNoteInGroup() *cobra.Command {
 	}
 }
 
-func getFileForGroup(groupName string, flag int, mode fs.FileMode) (*os.File, error) {
+func getFileForGroup(groupName string, flag int, mode fs.FileMode, skip bool) (*os.File, error) {
 	fileName := groupName + ".kps"
 	fileName, err := fixPath(fileName)
 
@@ -179,6 +180,11 @@ func getFileForGroup(groupName string, flag int, mode fs.FileMode) (*os.File, er
 	}
 
 	f, err := os.OpenFile(fileName, flag, mode)
+	if skip {
+		if _, err := f.Seek(int64(binary.Size(&group{})), 0); err != nil {
+			showError(err.Error(), 12)
+		}
+	}
 	return f, err
 }
 
@@ -186,18 +192,14 @@ func readNotesInGroup() *cobra.Command {
 	return &cobra.Command{
 		Use:     "all [name]",
 		Short:   "reads all notes from group with [name]",
-		Aliases: []string{"read"},
+		Aliases: []string{"view"},
 		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			file, err := getFileForGroup(args[0], os.O_RDONLY, 0600)
+			file, err := getFileForGroup(args[0], os.O_RDONLY, 0600, true)
 			if err != nil {
 				showError(err.Error(), 7)
 			}
 			defer file.Close()
-
-			if _, err := file.Seek(int64(binary.Size(&group{})), 0); err != nil {
-				showError(err.Error(), 12)
-			}
 
 			var n note
 
@@ -212,6 +214,45 @@ func readNotesInGroup() *cobra.Command {
 				}
 				if n.Id != 0 {
 					n.show()
+				}
+			}
+		},
+	}
+}
+
+func readNoteFromGroup() *cobra.Command {
+	return &cobra.Command{
+		Use:     "read [group] [noteId]",
+		Short:   "read single note from group by its id",
+		Args:    cobra.ExactArgs(2),
+		Aliases: []string{},
+		Run: func(cmd *cobra.Command, args []string) {
+			file, err := getFileForGroup(args[0], os.O_RDONLY, 0600, true)
+			if err != nil {
+				showError(err.Error(), 7)
+			}
+			defer file.Close()
+
+			id, err := strconv.ParseInt(args[1], 10, 64)
+
+			if err != nil {
+				showError("invalid id!", 14)
+			}
+
+			var n note
+
+			for {
+				err := binary.Read(file, binary.BigEndian, &n)
+				if err != nil {
+					if errors.Is(err, io.EOF) {
+						break
+					} else {
+						panic("keep: error while reading binary file")
+					}
+				}
+				if n.Id == id {
+					n.show()
+					break
 				}
 			}
 		},
