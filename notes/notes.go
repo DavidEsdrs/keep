@@ -1,4 +1,4 @@
-package main
+package notes
 
 import (
 	"fmt"
@@ -7,14 +7,14 @@ import (
 	"github.com/fatih/color"
 )
 
-type note struct {
+type Note struct {
 	Id        int64
 	Text      [100]byte
 	Color     int8
 	CreatedAt int64
 }
 
-func (n note) show() {
+func (n Note) Show() {
 	c := color.New(color.Attribute(n.Color)).Add(color.Bold)
 
 	t := time.Unix(n.CreatedAt/1000, 0)

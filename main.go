@@ -5,22 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
-	"path/filepath"
 	"strconv"
 
+	"github.com/DavidEsdrs/keep/common"
+	"github.com/DavidEsdrs/keep/groups"
+	"github.com/DavidEsdrs/keep/notes"
 	"github.com/spf13/cobra"
 )
 
 // errors
 var (
 	ErrUnexEOF = errors.New("keeps: unexpected EOF")
-)
-
-// global
-var (
-	info *NotesInfo
 )
 
 type Choose int
@@ -32,41 +28,6 @@ const (
 	ReadAll
 	Delete
 )
-
-var (
-	filename     string = "keeps.kps"
-	infoFilename string = "info.kpsinfo"
-	structSize   int64  = int64(binary.Size(note{}))
-)
-
-var (
-	IsProduction bool
-)
-
-func init() {
-	env := os.Getenv("ENV")
-
-	IsProduction = env == "production"
-
-	if IsProduction {
-		ex, _ := os.Executable()
-		ex = filepath.Dir(ex)
-		filename = fmt.Sprintf("%v\\%v", ex, filename)
-		infoFilename = fmt.Sprintf("%v\\%v", ex, infoFilename)
-	}
-
-	err := createStoreFile()
-
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	err = createInfoFile()
-
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-}
 
 func main() {
 	// create is the base command, i.e, when the CLI is called with no
@@ -80,13 +41,14 @@ func main() {
 	rootCmd.AddCommand(readSingle())
 
 	// groups commands
-	group := createGroup()
+	group := groups.CreateGroup()
 
 	rootCmd.AddCommand(group)
-	group.AddCommand(descGroup())
-	group.AddCommand(createNoteInGroup())
-	group.AddCommand(readNotesInGroup())
-	group.AddCommand(readNoteFromGroup())
+	group.AddCommand(groups.DescGroup())
+	group.AddCommand(groups.CreateNoteInGroup())
+	group.AddCommand(groups.ReadNotesInGroup())
+	group.AddCommand(groups.ReadNoteFromGroup())
+	group.AddCommand(groups.GetGroups())
 
 	rootCmd.PersistentFlags().Bool("inc", false, "Show the notes in decreasing order")
 
@@ -100,7 +62,7 @@ func create() *cobra.Command {
 		Short:   "creates a new note",
 		Args:    cobra.RangeArgs(1, 10),
 		Run: func(cmd *cobra.Command, args []string) {
-			f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+			f, err := os.OpenFile(common.Filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 			if err != nil {
 				panic(err)
 			}
@@ -108,18 +70,18 @@ func create() *cobra.Command {
 
 			for _, note := range args {
 				if len(note) <= 100 {
-					n := generateNote(note)
+					n := common.GenerateNote(note)
 					err := binary.Write(f, binary.BigEndian, &n)
 					if err != nil {
 						panic(err.Error())
 					}
-					info.Add()
+					common.Info.Add()
 				} else {
-					showError("the length of the note is bigger than allowed!", 10)
+					common.ShowError("the length of the note is bigger than allowed!", 10)
 				}
 			}
 
-			info.Save()
+			common.Info.Save()
 		},
 	}
 }
@@ -130,7 +92,7 @@ func readAll() *cobra.Command {
 		Aliases: []string{"remind", "get"},
 		Short:   "remind you all notes",
 		Run: func(cmd *cobra.Command, args []string) {
-			f, err := os.Open(filename)
+			f, err := os.Open(common.Filename)
 			if err != nil {
 				panic("can't manage to open file! did you deleted it? error: " + err.Error())
 			}
@@ -144,13 +106,13 @@ func readAll() *cobra.Command {
 				showDecreasingOrder(f)
 			}
 
-			fmt.Printf("%v notes\n", info.NotesQuant)
+			fmt.Printf("%v notes\n", common.Info.NotesQuant)
 		},
 	}
 }
 
 func showIncreasingOrder(f *os.File) {
-	var n note
+	var n notes.Note
 
 	for {
 		err := binary.Read(f, binary.BigEndian, &n)
@@ -162,14 +124,14 @@ func showIncreasingOrder(f *os.File) {
 			}
 		}
 		if n.Id != 0 {
-			n.show()
+			n.Show()
 		}
 	}
 }
 
 func showDecreasingOrder(f *os.File) {
-	var notes []note
-	var n note
+	var ns []notes.Note
+	var n notes.Note
 
 	for {
 		err := binary.Read(f, binary.BigEndian, &n)
@@ -180,12 +142,12 @@ func showDecreasingOrder(f *os.File) {
 				panic("keep: error while reading binary file. error -" + err.Error())
 			}
 		}
-		notes = append(notes, n)
+		ns = append(ns, n)
 	}
 
-	for i := len(notes) - 1; i >= 0; i-- {
-		if notes[i].Id != 0 {
-			note.show(notes[i])
+	for i := len(ns) - 1; i >= 0; i-- {
+		if ns[i].Id != 0 {
+			n.Show()
 		}
 	}
 }
@@ -197,7 +159,7 @@ func delete() *cobra.Command {
 		Short:   "deletes a given note",
 		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			file, err := os.OpenFile(filename, os.O_RDWR, 0666)
+			file, err := os.OpenFile(common.Filename, os.O_RDWR, 0666)
 			if err != nil {
 				panic(err)
 			}
@@ -205,22 +167,22 @@ func delete() *cobra.Command {
 
 			id, _ := strconv.ParseInt(args[0], 10, 64)
 
-			positionToRemove := (id - 1) * structSize
+			positionToRemove := (id - 1) * common.StructSize
 
 			_, err = file.Seek(positionToRemove, io.SeekStart)
 
 			if err != nil {
-				showError("can't remove. is it a valid ID?", 11)
+				common.ShowError("can't remove. is it a valid ID?", 11)
 			}
 
-			err = binary.Write(file, binary.BigEndian, &note{}) // we override the line with a empty struct
+			err = binary.Write(file, binary.BigEndian, &notes.Note{}) // we override the line with a empty struct
 
 			if err != nil {
 				panic(err)
 			}
 
-			info.Remove()
-			info.Save()
+			common.Info.Remove()
+			common.Info.Save()
 		},
 	}
 }
@@ -231,7 +193,7 @@ func readSingle() *cobra.Command {
 		Short: "return a single note",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			file, err := os.OpenFile(filename, os.O_RDWR, 0644)
+			file, err := os.OpenFile(common.Filename, os.O_RDWR, 0644)
 			if err != nil {
 				panic(err)
 			}
@@ -239,18 +201,18 @@ func readSingle() *cobra.Command {
 
 			id, _ := strconv.ParseInt(args[0], 10, 64)
 
-			if _, err := file.Seek((id-1)*structSize, io.SeekStart); err != nil {
+			if _, err := file.Seek((id-1)*common.StructSize, io.SeekStart); err != nil {
 				panic("invalid seeking! error - " + err.Error())
 			}
 
-			var n note
+			var n notes.Note
 
 			if err := binary.Read(file, binary.BigEndian, &n); err != nil {
 				panic("keep: error while reading binary file")
 			}
 
 			if n.Id == id { // assert
-				n.show()
+				n.Show()
 			}
 		},
 	}
