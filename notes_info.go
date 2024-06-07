@@ -1,11 +1,18 @@
 package main
 
 import (
+	"bufio"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"os"
+	"path"
+	"strconv"
+	"strings"
+)
+
+var (
+	ErrMalformatedFile = errors.New("info file content is malformated")
 )
 
 type NotesInfo struct {
@@ -38,37 +45,50 @@ func (n *NotesInfo) Save() {
 	}
 }
 
-func createFile() error {
-	// criar o arquivo
-	f, err := os.Create("info.bin")
+func createFile(filename string) error {
+	targetPath, err := getKeepFilePath()
+	if err != nil {
+		return err
+	}
+	f, err := OpenOrCreate(path.Join(targetPath, filename))
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	// escrever informações primárias
+	// write basic info
 	notesInfo := NotesInfo{}
+	content := fmt.Sprintf("%v,%v,%v", notesInfo.NotesQuant, notesInfo.LastUpdate, notesInfo.CreatedAt)
 
-	err = binary.Write(f, binary.BigEndian, &notesInfo)
+	f.WriteString(content)
 
-	// assinalar ao objeto global
+	// assign to the global object
 	info = &notesInfo
 
 	return err
 }
 
-func readFile() error {
-	f, err := os.Open("info.bin")
+// return the directory in which the files from keep must be stored
+func getKeepFilePath() (string, error) {
+	homerDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	keepFolder := path.Join(homerDir, ".keep")
+	return keepFolder, err
+}
+
+func readFile(filename string) error {
+	f, err := os.Open(filename)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	// ler as informações binárias
-	var notesInfo NotesInfo
-	err = binary.Read(f, binary.BigEndian, &notesInfo)
+	// parse info file
+	notesInfo, err := parseInfoContent(f)
 
-	if err != nil && !errors.Is(err, io.EOF) {
+	if err != nil {
 		return err
 	}
 
@@ -76,4 +96,43 @@ func readFile() error {
 	info = &notesInfo
 
 	return nil
+}
+
+// parse content of given file as keep info
+func parseInfoContent(f *os.File) (NotesInfo, error) {
+	var (
+		notesInfo NotesInfo
+		content   string
+	)
+
+	s := bufio.NewScanner(f)
+
+	if s.Scan() {
+		content = s.Text()
+	} else {
+		return notesInfo, fmt.Errorf("info file is empty: %w", ErrMalformatedFile)
+	}
+
+	segs := strings.Split(content, ",")
+	countStr, lastUpdateStr, createdAtStr := segs[0], segs[1], segs[2]
+
+	if count, err := strconv.Atoi(countStr); err != nil {
+		return notesInfo, ErrMalformatedFile
+	} else {
+		notesInfo.NotesQuant = uint32(count)
+	}
+
+	if lastUpdate, err := strconv.ParseInt(lastUpdateStr, 10, 64); err != nil {
+		return notesInfo, ErrMalformatedFile
+	} else {
+		notesInfo.LastUpdate = lastUpdate
+	}
+
+	if createdAt, err := strconv.ParseInt(createdAtStr, 10, 64); err != nil {
+		return notesInfo, ErrMalformatedFile
+	} else {
+		notesInfo.CreatedAt = createdAt
+	}
+
+	return notesInfo, nil
 }
