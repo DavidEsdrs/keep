@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -110,4 +111,18 @@ func colorFromString(c string) (color.Attribute, error) {
 	default:
 		return color.Attribute(0), fmt.Errorf("cor não reconhecida")
 	}
+}
+
+// OpenOrCreate opens or creates the file if it doesn't exist.
+// Any given folder that doesn't exist will be created recursively
+func OpenOrCreate(filename string) (*os.File, error) {
+	dir := filepath.Dir(filename)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return nil, fmt.Errorf("can't create directory: %w", err)
+	}
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0700)
+	if err != nil {
+		return nil, fmt.Errorf("can't open or create file: %w", err)
+	}
+	return f, nil
 }
