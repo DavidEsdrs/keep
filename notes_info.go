@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"os"
@@ -22,7 +21,7 @@ type NotesInfo struct {
 }
 
 func (n NotesInfo) String() string {
-	return fmt.Sprintf("NotesInfo{%v, %v, %v}", info.NotesQuant, info.LastUpdate, info.CreatedAt)
+	return fmt.Sprintf("%v,%v,%v", info.NotesQuant, info.LastUpdate, info.CreatedAt)
 }
 
 func (n *NotesInfo) Add() {
@@ -34,13 +33,15 @@ func (n *NotesInfo) Remove() {
 }
 
 func (n *NotesInfo) Save() {
-	f, err := os.OpenFile("info.bin", os.O_WRONLY, 0600)
+	f, err := os.OpenFile(InfoFilename, os.O_WRONLY, 0)
 	if err != nil {
-		panic("something went wrong with the info file! did you deleted it?")
+		panic("something went wrong with the info file! did you delete it?")
 	}
 	defer f.Close()
 
-	if err := binary.Write(f, binary.BigEndian, n); err != nil {
+	_, err = f.WriteString(n.String())
+
+	if err != nil {
 		panic(fmt.Sprintf("%v%v", "something went wrong while writing into the info file!: ", err.Error()))
 	}
 }
