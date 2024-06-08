@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -49,7 +50,7 @@ func generateNote(text string) string {
 	now := time.Now().UnixMilli()
 	color := randomColor()
 	id := info.NotesQuant + 1
-	return fmt.Sprintf("[%v]{%v}(%v)`%v`\n", id, now, color, text)
+	return fmt.Sprintf("%v,%v,%v,%v\n", id, now, color, text)
 }
 
 func parseTextAsNote(text string) note {
@@ -115,12 +116,12 @@ func colorFromString(c string) (color.Attribute, error) {
 
 // OpenOrCreate opens or creates the file if it doesn't exist.
 // Any given folder that doesn't exist will be created recursively
-func OpenOrCreate(filename string) (*os.File, error) {
+func OpenOrCreate(filename string, flag int, perm fs.FileMode) (*os.File, error) {
 	dir := filepath.Dir(filename)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, fmt.Errorf("can't create directory: %w", err)
 	}
-	f, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0700)
+	f, err := os.OpenFile(filename, flag, perm)
 	if err != nil {
 		return nil, fmt.Errorf("can't open or create file: %w", err)
 	}
