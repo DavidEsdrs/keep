@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"strconv"
 	"time"
 
@@ -20,11 +21,12 @@ var (
 )
 
 var (
-	info *NotesInfo
+	info         *NotesInfo
+	InfoFilename string = "info.kps"
 )
 
 func init() {
-	err := createInfoFile()
+	err := createInfoFile(InfoFilename)
 
 	if err != nil {
 		log.Fatal(err.Error())
@@ -59,17 +61,16 @@ func main() {
 	rootCmd.Execute()
 }
 
-func createInfoFile() error {
-	if doesFileExists("info.bin") {
-		return readFile()
+func createInfoFile(filename string) error {
+	if doesFileExists(filename) {
+		return readFile(filename)
 	}
 
-	return createFile()
+	return createFile(filename)
 }
 
 func doesFileExists(filePath string) bool {
 	_, error := os.Stat(filePath)
-	//return !os.IsNotExist(err)
 	return !errors.Is(error, os.ErrNotExist)
 }
 
@@ -129,7 +130,11 @@ func create() *cobra.Command {
 		Short:   "creates a new note",
 		Args:    cobra.RangeArgs(1, 10),
 		Run: func(cmd *cobra.Command, args []string) {
-			f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+			dir, err := getKeepFilePath()
+			if err != nil {
+				panic(err)
+			}
+			f, err := OpenOrCreate(path.Join(dir, filename), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
 			if err != nil {
 				panic(err)
 			}
@@ -140,13 +145,22 @@ func create() *cobra.Command {
 			for _, note := range args {
 				if len(note) <= 100 {
 					note = generateNote(note)
-					w.WriteString(note)
+					n, err := w.WriteString(note)
+					if err != nil {
+						panic("error while writing: " + err.Error())
+					}
+					if n == 0 {
+						fmt.Println("no data written with no error")
+					}
 				} else {
 					showError("the length of the note is bigger than allowed!", 10)
 				}
 			}
 
-			w.Flush()
+			err = w.Flush()
+			if err != nil {
+				panic("error while flushing! " + err.Error())
+			}
 			info.Add()
 			info.Save()
 		},
@@ -209,7 +223,7 @@ func delete() *cobra.Command {
 		Short:   "deletes a given note",
 		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			file, err := os.OpenFile(filename, os.O_RDWR, 0644)
+			file, err := OpenOrCreate(filename, os.O_CREATE|os.O_RDWR, 0600)
 			if err != nil {
 				panic(err)
 			}
@@ -262,7 +276,7 @@ func readSingle() *cobra.Command {
 		Short: "return a single note",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			file, err := os.OpenFile(filename, os.O_RDWR, 0644)
+			file, err := OpenOrCreate(filename, os.O_CREATE|os.O_RDONLY, 0600)
 			if err != nil {
 				panic(err)
 			}
