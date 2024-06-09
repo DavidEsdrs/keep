@@ -47,7 +47,7 @@ func TestCreateInfoFile(t *testing.T) {
 			}
 		}
 		// main test
-		err = createInfoFile(filename)
+		_, err = createInfoFile(filename)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -70,7 +70,7 @@ func TestCreateInfoFile(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		err = createInfoFile(filename)
+		_, err = createInfoFile(filename)
 		if err != nil {
 			t.Fatal(err)
 		}
