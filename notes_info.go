@@ -134,6 +134,9 @@ func parseInfoContent(f *os.File) (NotesInfo, error) {
 	}
 
 	segs := strings.Split(content, ",")
+	if len(segs) != 3 {
+		return notesInfo, fmt.Errorf("info file is malformated")
+	}
 	countStr, lastUpdateStr, createdAtStr := segs[0], segs[1], segs[2]
 
 	if count, err := strconv.Atoi(countStr); err != nil {
