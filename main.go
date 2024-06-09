@@ -1,23 +1,85 @@
 package main
 
 import (
-	"encoding/binary"
+	"bufio"
 	"errors"
 	"fmt"
-	"io"
+	"log"
 	"os"
+	"path"
 	"strconv"
+	"time"
 
-	"github.com/DavidEsdrs/keep/common"
-	"github.com/DavidEsdrs/keep/groups"
-	"github.com/DavidEsdrs/keep/notes"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
-// errors
 var (
 	ErrUnexEOF = errors.New("keeps: unexpected EOF")
 )
+
+var (
+	info         *NotesInfo
+	InfoFilename string = "info.kps"
+)
+
+func init() {
+	_, err := createInfoFile(InfoFilename)
+
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+}
+
+func main() {
+	// create is the base command, i.e, when the CLI is called with no
+	// subcommands (such as `keep "this a note"`) it is implicity that we want to
+	// create a new note
+	rootCmd := create()
+
+	rootCmd.AddCommand(readAll())
+	rootCmd.AddCommand(delete())
+	rootCmd.AddCommand(readSingle())
+
+	rootCmd.PersistentFlags().Bool("desc", false, "Show the notes in decreasing order")
+
+	rootCmd.Execute()
+}
+
+type note struct {
+	id        int64
+	text      string
+	color     color.Attribute
+	createdAt int64
+}
+
+func (n note) show() {
+	c := color.New(n.color).Add(color.Bold)
+
+	t := time.Unix(n.createdAt/1000, 0)
+
+	blue := color.New(color.BgHiBlue).Add(color.Bold)
+
+	blue.DisableColor()
+
+	blue.Print(fmt.Sprint(n.id) + " ~ ")
+
+	blue.EnableColor()
+
+	now := time.Now()
+
+	if t.Year() == now.Year() && t.Month() == now.Month() && t.Day() == now.Day() {
+		blue.Printf(" %v ", t.Local().Format(time.Kitchen))
+	} else {
+		blue.Printf(" %v ", t.Local().Format("01/02/2006"))
+	}
+
+	blue.DisableColor()
+	blue.Print(" - ")
+	blue.EnableColor()
+	c.Print(n.text)
+	c.Println()
+}
 
 type Choose int
 
@@ -29,31 +91,7 @@ const (
 	Delete
 )
 
-func main() {
-	// create is the base command, i.e, when the CLI is called with no
-	// subcommands (such as `keep "this a note"`) it is implicity that we want to
-	// create a new note
-	rootCmd := create()
-
-	// notes commands
-	rootCmd.AddCommand(readAll())
-	rootCmd.AddCommand(delete())
-	rootCmd.AddCommand(readSingle())
-
-	// groups commands
-	group := groups.CreateGroup()
-
-	rootCmd.AddCommand(group)
-	group.AddCommand(groups.DescGroup())
-	group.AddCommand(groups.CreateNoteInGroup())
-	group.AddCommand(groups.ReadNotesInGroup())
-	group.AddCommand(groups.ReadNoteFromGroup())
-	group.AddCommand(groups.GetGroups())
-
-	rootCmd.PersistentFlags().Bool("inc", false, "Show the notes in decreasing order")
-
-	rootCmd.Execute()
-}
+const filename string = "keeps.txt"
 
 func create() *cobra.Command {
 	return &cobra.Command{
@@ -62,26 +100,39 @@ func create() *cobra.Command {
 		Short:   "creates a new note",
 		Args:    cobra.RangeArgs(1, 10),
 		Run: func(cmd *cobra.Command, args []string) {
-			f, err := os.OpenFile(common.Filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+			dir, err := getKeepFilePath()
+			if err != nil {
+				panic(err)
+			}
+			f, err := OpenOrCreate(path.Join(dir, filename), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
 			if err != nil {
 				panic(err)
 			}
 			defer f.Close()
 
+			w := bufio.NewWriter(f)
+
 			for _, note := range args {
 				if len(note) <= 100 {
-					n := common.GenerateNote(note)
-					err := binary.Write(f, binary.BigEndian, &n)
+					note = generateNote(note)
+					n, err := w.WriteString(note)
 					if err != nil {
-						panic(err.Error())
+						panic("error while writing: " + err.Error())
 					}
-					common.Info.Add()
+					if n == 0 {
+						fmt.Println("no data written with no error")
+					}
 				} else {
-					common.ShowError("the length of the note is bigger than allowed!", 10)
+					showError("the length of the note is bigger than allowed!", 10)
 				}
 			}
 
-			common.Info.Save()
+			err = w.Flush()
+			if err != nil {
+				panic("error while flushing! " + err.Error())
+			}
+			info.Add()
+			info.Save()
 		},
 	}
 }
@@ -92,63 +143,50 @@ func readAll() *cobra.Command {
 		Aliases: []string{"remind", "get"},
 		Short:   "remind you all notes",
 		Run: func(cmd *cobra.Command, args []string) {
-			f, err := os.Open(common.Filename)
+			dir, err := getKeepFilePath()
+			if err != nil {
+				panic(err)
+			}
+			f, err := OpenOrCreate(path.Join(dir, filename), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
 			if err != nil {
 				panic("can't manage to open file! did you deleted it? error: " + err.Error())
 			}
 			defer f.Close()
 
-			isIncreasing, _ := cmd.Flags().GetBool("inc")
+			s := bufio.NewScanner(f)
 
-			if isIncreasing {
-				showIncreasingOrder(f)
+			isDecreasing, _ := cmd.Flags().GetBool("desc")
+
+			if isDecreasing {
+				showDecreasingOrder(s)
 			} else {
-				showDecreasingOrder(f)
+				showIncreasingOrder(s)
 			}
 
-			fmt.Printf("%v notes\n", common.Info.NotesQuant)
+			fmt.Printf("%v notes\n", info.NotesQuant)
 		},
 	}
 }
 
-func showIncreasingOrder(f *os.File) {
-	var n notes.Note
-
-	for {
-		err := binary.Read(f, binary.BigEndian, &n)
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			} else {
-				panic("keep: error while reading binary file")
-			}
-		}
-		if n.Id != 0 {
-			n.Show()
-		}
+func showIncreasingOrder(s *bufio.Scanner) {
+	for s.Scan() {
+		text := s.Text()
+		note := parseTextAsNote(text)
+		note.show()
 	}
 }
 
-func showDecreasingOrder(f *os.File) {
-	var ns []notes.Note
-	var n notes.Note
+func showDecreasingOrder(s *bufio.Scanner) {
+	var notes []note
 
-	for {
-		err := binary.Read(f, binary.BigEndian, &n)
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			} else {
-				panic("keep: error while reading binary file. error -" + err.Error())
-			}
-		}
-		ns = append(ns, n)
+	for s.Scan() {
+		text := s.Text()
+		note := parseTextAsNote(text)
+		notes = append(notes, note)
 	}
 
-	for i := len(ns) - 1; i >= 0; i-- {
-		if ns[i].Id != 0 {
-			n.Show()
-		}
+	for i := len(notes) - 1; i >= 0; i-- {
+		note.show(notes[i])
 	}
 }
 
@@ -159,7 +197,11 @@ func delete() *cobra.Command {
 		Short:   "deletes a given note",
 		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			file, err := os.OpenFile(common.Filename, os.O_RDWR, 0666)
+			dir, err := getKeepFilePath()
+			if err != nil {
+				panic(err)
+			}
+			file, err := OpenOrCreate(path.Join(dir, filename), os.O_CREATE|os.O_RDWR, 0600)
 			if err != nil {
 				panic(err)
 			}
@@ -167,22 +209,41 @@ func delete() *cobra.Command {
 
 			id, _ := strconv.ParseInt(args[0], 10, 64)
 
-			positionToRemove := (id - 1) * common.StructSize
+			s := bufio.NewScanner(file)
+			w := bufio.NewWriter(file)
 
-			_, err = file.Seek(positionToRemove, io.SeekStart)
+			var lines []string
 
-			if err != nil {
-				common.ShowError("can't remove. is it a valid ID?", 11)
+			for s.Scan() {
+				line := s.Text()
+
+				note := parseTextAsNote(line)
+
+				if note.id != id {
+					lines = append(lines, line)
+				}
 			}
 
-			err = binary.Write(file, binary.BigEndian, &notes.Note{}) // we override the line with a empty struct
+			err = file.Truncate(0) // cleans the file
 
 			if err != nil {
-				panic(err)
+				panic("keeps: error while truncating file! error - " + err.Error())
 			}
 
-			common.Info.Remove()
-			common.Info.Save()
+			_, err = file.Seek(0, 0)
+
+			if err != nil {
+				panic("keeps: error while seeking file! error - " + err.Error())
+			}
+
+			for _, l := range lines {
+				w.WriteString(fmt.Sprintf("%v\n", l))
+			}
+
+			w.Flush()
+
+			info.Remove()
+			info.Save()
 		},
 	}
 }
@@ -193,7 +254,11 @@ func readSingle() *cobra.Command {
 		Short: "return a single note",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			file, err := os.OpenFile(common.Filename, os.O_RDWR, 0644)
+			dir, err := getKeepFilePath()
+			if err != nil {
+				panic(err)
+			}
+			file, err := OpenOrCreate(path.Join(dir, filename), os.O_CREATE|os.O_RDONLY, 0600)
 			if err != nil {
 				panic(err)
 			}
@@ -201,18 +266,23 @@ func readSingle() *cobra.Command {
 
 			id, _ := strconv.ParseInt(args[0], 10, 64)
 
-			if _, err := file.Seek((id-1)*common.StructSize, io.SeekStart); err != nil {
-				panic("invalid seeking! error - " + err.Error())
+			s := bufio.NewScanner(file)
+			found := false
+
+			for s.Scan() {
+				line := s.Text()
+
+				note := parseTextAsNote(line)
+
+				if note.id == id {
+					note.show()
+					found = true
+					break
+				}
 			}
 
-			var n notes.Note
-
-			if err := binary.Read(file, binary.BigEndian, &n); err != nil {
-				panic("keep: error while reading binary file")
-			}
-
-			if n.Id == id { // assert
-				n.Show()
+			if !found {
+				fmt.Println("not found note with given id")
 			}
 		},
 	}
