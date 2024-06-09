@@ -26,7 +26,7 @@ var (
 )
 
 func init() {
-	err := createInfoFile(InfoFilename)
+	_, err := createInfoFile(InfoFilename)
 
 	if err != nil {
 		log.Fatal(err.Error())
@@ -59,19 +59,6 @@ func main() {
 	rootCmd.PersistentFlags().Bool("inc", false, "Show the notes in decreasing order")
 
 	rootCmd.Execute()
-}
-
-func createInfoFile(filename string) error {
-	if doesFileExists(filename) {
-		return readFile(filename)
-	}
-
-	return createFile(filename)
-}
-
-func doesFileExists(filePath string) bool {
-	_, error := os.Stat(filePath)
-	return !errors.Is(error, os.ErrNotExist)
 }
 
 type note struct {
