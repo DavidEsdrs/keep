@@ -33,9 +33,10 @@ func (n *NotesInfo) Remove() {
 }
 
 func (n *NotesInfo) Save() {
-	f, err := os.OpenFile(InfoFilename, os.O_WRONLY, 0)
+	dir, _ := os.UserHomeDir()
+	f, err := os.OpenFile(path.Join(dir, ".keep", InfoFilename), os.O_WRONLY, 0700)
 	if err != nil {
-		panic("something went wrong with the info file! did you delete it?")
+		panic("something went wrong with the info file! did you delete it?: " + err.Error())
 	}
 	defer f.Close()
 
@@ -46,27 +47,45 @@ func (n *NotesInfo) Save() {
 	}
 }
 
-func createFile(filename string) error {
+func doesFileExists(filePath string) bool {
+	_, error := os.Stat(filePath)
+	return !errors.Is(error, os.ErrNotExist)
+}
+
+func createInfoFile(filename string) error {
+	var notesInfo NotesInfo
+
 	targetPath, err := getKeepFilePath()
 	if err != nil {
 		return err
 	}
-	f, err := OpenOrCreate(path.Join(targetPath, filename))
-	if err != nil {
-		return err
+	targetFile := path.Join(targetPath, filename)
+
+	if doesFileExists(filename) {
+		f, err := os.Open(targetFile)
+		if err != nil {
+			return fmt.Errorf("unable to open info file: %w", err)
+		}
+		notesInfo, err = parseInfoContent(f)
+		if err != nil {
+			return fmt.Errorf("unable to parse info file content: %w", err)
+		}
+	} else {
+		f, err := OpenOrCreate(targetFile, os.O_CREATE|os.O_RDWR, 0600)
+		if err != nil {
+			return fmt.Errorf("unable to create info file: %w", err)
+		}
+		defer f.Close()
+		// write basic info
+		notesInfo := NotesInfo{}
+		content := fmt.Sprintf("%v,%v,%v", notesInfo.NotesQuant, notesInfo.LastUpdate, notesInfo.CreatedAt)
+		f.WriteString(content)
 	}
-	defer f.Close()
-
-	// write basic info
-	notesInfo := NotesInfo{}
-	content := fmt.Sprintf("%v,%v,%v", notesInfo.NotesQuant, notesInfo.LastUpdate, notesInfo.CreatedAt)
-
-	f.WriteString(content)
 
 	// assign to the global object
 	info = &notesInfo
 
-	return err
+	return nil
 }
 
 // return the directory in which the files from keep must be stored
