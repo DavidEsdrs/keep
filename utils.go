@@ -118,7 +118,7 @@ func colorFromString(c string) (color.Attribute, error) {
 // Any given folder that doesn't exist will be created recursively
 func OpenOrCreate(filename string, flag int, perm fs.FileMode) (*os.File, error) {
 	dir := filepath.Dir(filename)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0640); err != nil {
 		return nil, fmt.Errorf("can't create directory: %w", err)
 	}
 	f, err := os.OpenFile(filename, flag, perm)
