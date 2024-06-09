@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"errors"
+	"io"
 	"os"
 	"path"
 	"testing"
@@ -72,5 +74,45 @@ func TestCreateInfoFile(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+	})
+}
+
+func TestOpenOrCreate(t *testing.T) {
+	filename := "TestOpenOrCreate"
+
+	t.Run("Read only file", func(t *testing.T) {
+		defer os.Remove(filename)
+		f, err := OpenOrCreate(filename, os.O_CREATE|os.O_RDONLY, 0400)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+
+		w := bufio.NewWriter(f)
+		w.WriteString("this is illegal write")
+		err = w.Flush() // flushing ensures we are trying to write into the file
+		if err == nil {
+			t.Fatal("illegal write to read-only file")
+		}
+
+		r := bufio.NewReader(f)
+		if _, err := r.ReadByte(); err != nil && !errors.Is(err, io.EOF) {
+			t.Fatal("unable to read file - ", err)
+		}
+	})
+
+	t.Run("Open already existing file", func(t *testing.T) {
+		defer os.Remove(filename)
+		f, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0600)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.Close()
+
+		f, err = OpenOrCreate(filename, os.O_RDONLY, 0600)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
 	})
 }
