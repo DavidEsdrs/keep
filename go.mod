@@ -3,7 +3,6 @@ module github.com/DavidEsdrs/keep
 go 1.22.0
 
 require (
-	github.com/DavidEsdrs/godeline v1.1.0 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

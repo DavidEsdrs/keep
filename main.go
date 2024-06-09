@@ -10,8 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/DavidEsdrs/godeline"
-	editnode "github.com/DavidEsdrs/godeline/edit-node"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
@@ -31,19 +29,6 @@ func init() {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-
-	t := editnode.NewEditTree()
-
-	t.AddDelimiterType("{", "}")
-	t.AddDelimiterType("[", "]")
-	t.AddDelimiterType("(", ")")
-	t.AddDelimiterType("`", "`")
-
-	p := godeline.NewProcessor(&t, 1<<12)
-
-	p.Sanitize()
-
-	processor = &p
 }
 
 func main() {
@@ -107,8 +92,6 @@ const (
 )
 
 const filename string = "keeps.txt"
-
-var processor *godeline.Processor
 
 func create() *cobra.Command {
 	return &cobra.Command{
