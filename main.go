@@ -56,7 +56,7 @@ func main() {
 	rootCmd.AddCommand(delete())
 	rootCmd.AddCommand(readSingle())
 
-	rootCmd.PersistentFlags().Bool("inc", false, "Show the notes in decreasing order")
+	rootCmd.PersistentFlags().Bool("desc", false, "Show the notes in decreasing order")
 
 	rootCmd.Execute()
 }
@@ -160,7 +160,11 @@ func readAll() *cobra.Command {
 		Aliases: []string{"remind", "get"},
 		Short:   "remind you all notes",
 		Run: func(cmd *cobra.Command, args []string) {
-			f, err := os.Open(filename)
+			dir, err := getKeepFilePath()
+			if err != nil {
+				panic(err)
+			}
+			f, err := OpenOrCreate(path.Join(dir, filename), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
 			if err != nil {
 				panic("can't manage to open file! did you deleted it? error: " + err.Error())
 			}
@@ -168,12 +172,12 @@ func readAll() *cobra.Command {
 
 			s := bufio.NewScanner(f)
 
-			isIncreasing, _ := cmd.Flags().GetBool("inc")
+			isDecreasing, _ := cmd.Flags().GetBool("desc")
 
-			if isIncreasing {
-				showIncreasingOrder(s)
-			} else {
+			if isDecreasing {
 				showDecreasingOrder(s)
+			} else {
+				showIncreasingOrder(s)
 			}
 
 			fmt.Printf("%v notes\n", info.NotesQuant)
