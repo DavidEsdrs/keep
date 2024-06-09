@@ -81,29 +81,6 @@ func parseTextAsNote(text string) note {
 	}
 }
 
-func colorFromString(c string) (color.Attribute, error) {
-	switch strings.ToLower(c) {
-	case "red":
-		return color.FgRed, nil
-	case "green":
-		return color.FgGreen, nil
-	case "blue":
-		return color.FgBlue, nil
-	case "yellow":
-		return color.FgYellow, nil
-	case "black":
-		return color.FgBlack, nil
-	case "white":
-		return color.FgWhite, nil
-	case "cyan":
-		return color.FgCyan, nil
-	case "magenta":
-		return color.FgMagenta, nil
-	default:
-		return color.Attribute(0), fmt.Errorf("cor não reconhecida")
-	}
-}
-
 // OpenOrCreate opens or creates the file if it doesn't exist.
 // Any given folder that doesn't exist will be created recursively
 func OpenOrCreate(filename string, flag int, perm fs.FileMode) (*os.File, error) {
