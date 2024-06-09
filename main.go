@@ -122,6 +122,7 @@ func create() *cobra.Command {
 					if n == 0 {
 						fmt.Println("no data written with no error")
 					}
+					info.Add()
 				} else {
 					showError("the length of the note is bigger than allowed!", 10)
 				}
@@ -131,7 +132,6 @@ func create() *cobra.Command {
 			if err != nil {
 				panic("error while flushing! " + err.Error())
 			}
-			info.Add()
 			info.Save()
 		},
 	}
