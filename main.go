@@ -214,7 +214,11 @@ func delete() *cobra.Command {
 		Short:   "deletes a given note",
 		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			file, err := OpenOrCreate(filename, os.O_CREATE|os.O_RDWR, 0600)
+			dir, err := getKeepFilePath()
+			if err != nil {
+				panic(err)
+			}
+			file, err := OpenOrCreate(path.Join(dir, filename), os.O_CREATE|os.O_RDWR, 0600)
 			if err != nil {
 				panic(err)
 			}
@@ -267,7 +271,11 @@ func readSingle() *cobra.Command {
 		Short: "return a single note",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			file, err := OpenOrCreate(filename, os.O_CREATE|os.O_RDONLY, 0600)
+			dir, err := getKeepFilePath()
+			if err != nil {
+				panic(err)
+			}
+			file, err := OpenOrCreate(path.Join(dir, filename), os.O_CREATE|os.O_RDONLY, 0600)
 			if err != nil {
 				panic(err)
 			}
@@ -276,6 +284,7 @@ func readSingle() *cobra.Command {
 			id, _ := strconv.ParseInt(args[0], 10, 64)
 
 			s := bufio.NewScanner(file)
+			found := false
 
 			for s.Scan() {
 				line := s.Text()
@@ -284,8 +293,13 @@ func readSingle() *cobra.Command {
 
 				if note.id == id {
 					note.show()
+					found = true
 					break
 				}
+			}
+
+			if !found {
+				fmt.Println("not found note with given id")
 			}
 		},
 	}
