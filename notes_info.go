@@ -52,28 +52,28 @@ func doesFileExists(filePath string) bool {
 	return !errors.Is(error, os.ErrNotExist)
 }
 
-func createInfoFile(filename string) error {
+func createInfoFile(filename string) (*NotesInfo, error) {
 	var notesInfo NotesInfo
 
 	targetPath, err := getKeepFilePath()
 	if err != nil {
-		return err
+		return &notesInfo, err
 	}
 	targetFile := path.Join(targetPath, filename)
 
-	if doesFileExists(filename) {
-		f, err := os.Open(targetFile)
+	if doesFileExists(targetFile) {
+		f, err := os.OpenFile(targetFile, os.O_RDWR, 0)
 		if err != nil {
-			return fmt.Errorf("unable to open info file: %w", err)
+			return &notesInfo, fmt.Errorf("unable to open info file: %w", err)
 		}
 		notesInfo, err = parseInfoContent(f)
 		if err != nil {
-			return fmt.Errorf("unable to parse info file content: %w", err)
+			return &notesInfo, fmt.Errorf("unable to parse info file content: %w", err)
 		}
 	} else {
 		f, err := OpenOrCreate(targetFile, os.O_CREATE|os.O_RDWR, 0600)
 		if err != nil {
-			return fmt.Errorf("unable to create info file: %w", err)
+			return &notesInfo, fmt.Errorf("unable to create info file: %w", err)
 		}
 		defer f.Close()
 		// write basic info
@@ -85,7 +85,7 @@ func createInfoFile(filename string) error {
 	// assign to the global object
 	info = &notesInfo
 
-	return nil
+	return &notesInfo, nil
 }
 
 // return the directory in which the files from keep must be stored
@@ -135,24 +135,24 @@ func parseInfoContent(f *os.File) (NotesInfo, error) {
 
 	segs := strings.Split(content, ",")
 	if len(segs) != 3 {
-		return notesInfo, fmt.Errorf("info file is malformated")
+		return notesInfo, fmt.Errorf("info file is malformated - too few segments for splitting")
 	}
 	countStr, lastUpdateStr, createdAtStr := segs[0], segs[1], segs[2]
 
 	if count, err := strconv.Atoi(countStr); err != nil {
-		return notesInfo, ErrMalformatedFile
+		return notesInfo, fmt.Errorf("unable to parse notes quantity - %w", ErrMalformatedFile)
 	} else {
 		notesInfo.NotesQuant = uint32(count)
 	}
 
 	if lastUpdate, err := strconv.ParseInt(lastUpdateStr, 10, 64); err != nil {
-		return notesInfo, ErrMalformatedFile
+		return notesInfo, fmt.Errorf("unable to parse last update - %w", ErrMalformatedFile)
 	} else {
 		notesInfo.LastUpdate = lastUpdate
 	}
 
 	if createdAt, err := strconv.ParseInt(createdAtStr, 10, 64); err != nil {
-		return notesInfo, ErrMalformatedFile
+		return notesInfo, fmt.Errorf("unable to parse created at - %w", ErrMalformatedFile)
 	} else {
 		notesInfo.CreatedAt = createdAt
 	}
