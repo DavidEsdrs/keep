@@ -54,17 +54,7 @@ func generateNote(text string) string {
 }
 
 func parseTextAsNote(text string) note {
-	result, err := processor.Tokenize(text)
-	if err != nil {
-		showError(err.Error(), 9)
-	}
-	tokens := result.Tokens()
-
-	var tokensText [4]string
-
-	for i, t := range tokens {
-		tokensText[i] = t.InnerText
-	}
+	tokensText := strings.Split(text, ",")
 
 	id, _ := strconv.ParseInt(tokensText[0], 10, 64)
 
