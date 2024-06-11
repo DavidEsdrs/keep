@@ -40,6 +40,16 @@ func main() {
 	rootCmd.AddCommand(readAll())
 	rootCmd.AddCommand(delete())
 	rootCmd.AddCommand(readSingle())
+	rootCmd.AddCommand(deleteNote())
+
+	// group
+	groupCmd := createGroup()
+	rootCmd.AddCommand(groupCmd)
+
+	groupCmd.AddCommand(addNoteInGroup())
+	groupCmd.AddCommand(readFromGroup())
+	groupCmd.AddCommand(deleteGroup())
+	groupCmd.AddCommand(readGroups())
 
 	rootCmd.PersistentFlags().Bool("desc", false, "Show the notes in decreasing order")
 
@@ -100,7 +110,7 @@ func create() *cobra.Command {
 		Short:   "creates a new note",
 		Args:    cobra.RangeArgs(1, 10),
 		Run: func(cmd *cobra.Command, args []string) {
-			dir, err := getKeepFilePath()
+			dir, err := GetKeepFilePath()
 			if err != nil {
 				panic(err)
 			}
@@ -137,13 +147,83 @@ func create() *cobra.Command {
 	}
 }
 
+func createGroup() *cobra.Command {
+	return &cobra.Command{
+		Use:     "group [name] [desc]",
+		Aliases: []string{},
+		Short:   "creates a new note group",
+		Args:    cobra.ExactArgs(2),
+		Run: func(cmd *cobra.Command, args []string) {
+			groupName := args[0]
+			description := args[1]
+			h, err := NewNoteFile(groupName, description)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Printf("group %s created\n", string(h.Title[:]))
+		},
+	}
+}
+
+func addNoteInGroup() *cobra.Command {
+	return &cobra.Command{
+		Use:     "add [group] [message]",
+		Aliases: []string{},
+		Short:   "adds note in group",
+		Args:    cobra.ExactArgs(2),
+		Run: func(cmd *cobra.Command, args []string) {
+			h, err := GetGroupHeader(args[0])
+			if err != nil {
+				panic(err)
+			}
+			n := NewNote(int64(h.SizeAlltime+1), args[1], randomColor(), time.Now().UnixMilli())
+			err = AddNote(args[0], &n)
+			if err != nil {
+				fmt.Println(err)
+			}
+		},
+	}
+}
+
+func readFromGroup() *cobra.Command {
+	return &cobra.Command{
+		Use:     "get [group] [id]",
+		Aliases: []string{},
+		Short:   "read notes from group",
+		Args:    cobra.RangeArgs(1, 2),
+		Run: func(cmd *cobra.Command, args []string) {
+			groupName := args[0]
+			if len(args) == 1 {
+				notes, err := ReadAllNotes(groupName)
+				if err != nil {
+					panic(err)
+				}
+				for n := range notes {
+					n.Show()
+				}
+			} else if len(args) == 2 {
+				id, err := strconv.ParseInt(args[1], 10, 64)
+				if err != nil {
+					fmt.Println("id is not a valid number")
+				}
+				note, err := GetNoteById(groupName, id)
+				if err != nil {
+					fmt.Println(err.Error())
+					return
+				}
+				note.Show()
+			}
+		},
+	}
+}
+
 func readAll() *cobra.Command {
 	return &cobra.Command{
 		Use:     "all",
 		Aliases: []string{"remind", "get"},
 		Short:   "remind you all notes",
 		Run: func(cmd *cobra.Command, args []string) {
-			dir, err := getKeepFilePath()
+			dir, err := GetKeepFilePath()
 			if err != nil {
 				panic(err)
 			}
@@ -164,6 +244,45 @@ func readAll() *cobra.Command {
 			}
 
 			fmt.Printf("%v notes\n", info.NotesQuant)
+		},
+	}
+}
+
+func deleteNote() *cobra.Command {
+	return &cobra.Command{
+		Use:     "delete [group] [id]",
+		Aliases: []string{"remind", "get"},
+		Short:   "delete a given note within a group",
+		Run: func(cmd *cobra.Command, args []string) {
+			groupName := args[0]
+			id, err := strconv.ParseInt(args[1], 10, 64)
+			if err != nil {
+				fmt.Println("invalid id given")
+				return
+			}
+			err = DeleteNoteById(groupName, id)
+			if err != nil {
+				fmt.Printf("unable to delete note %v - error: %v", id, err.Error())
+				return
+			}
+			fmt.Printf("note %v deleted", id)
+		},
+	}
+}
+
+func deleteGroup() *cobra.Command {
+	return &cobra.Command{
+		Use:     "delete [group]",
+		Aliases: []string{},
+		Short:   "delete a group",
+		Run: func(cmd *cobra.Command, args []string) {
+			groupName := args[0]
+			err := DeleteGroup(groupName)
+			if err != nil {
+				fmt.Printf("unable to delete group %v - error: %v", groupName, err.Error())
+				return
+			}
+			fmt.Printf("group %v deleted", groupName)
 		},
 	}
 }
@@ -197,7 +316,7 @@ func delete() *cobra.Command {
 		Short:   "deletes a given note",
 		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			dir, err := getKeepFilePath()
+			dir, err := GetKeepFilePath()
 			if err != nil {
 				panic(err)
 			}
@@ -254,7 +373,7 @@ func readSingle() *cobra.Command {
 		Short: "return a single note",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			dir, err := getKeepFilePath()
+			dir, err := GetKeepFilePath()
 			if err != nil {
 				panic(err)
 			}
@@ -283,6 +402,23 @@ func readSingle() *cobra.Command {
 
 			if !found {
 				fmt.Println("not found note with given id")
+			}
+		},
+	}
+}
+
+func readGroups() *cobra.Command {
+	return &cobra.Command{
+		Use:   "all",
+		Short: "get all groups created",
+		Run: func(cmd *cobra.Command, args []string) {
+			groups, err := GetGroups()
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+			for _, g := range groups {
+				g.Show()
 			}
 		},
 	}
