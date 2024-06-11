@@ -10,7 +10,7 @@ import (
 )
 
 func TestGetKeepFilePath(t *testing.T) {
-	_, err := getKeepFilePath()
+	_, err := GetKeepFilePath()
 	if err != nil {
 		t.Fatal(err)
 	}
