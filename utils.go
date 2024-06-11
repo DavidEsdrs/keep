@@ -49,7 +49,7 @@ func showError(text string, errCode int) {
 func generateNote(text string) string {
 	now := time.Now().UnixMilli()
 	color := randomColor()
-	id := info.NotesQuant + 1
+	id := info.SizeAlltime + 1
 	return fmt.Sprintf("%v,%v,%v,%v\n", id, now, color, text)
 }
 

@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bufio"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"os"
 	"path"
-	"strconv"
-	"strings"
 )
 
 var (
@@ -15,21 +13,25 @@ var (
 )
 
 type NotesInfo struct {
-	NotesQuant uint32
-	LastUpdate int64 // UNIX timestamp
-	CreatedAt  int64
+	Title       [20]rune
+	Description [200]rune
+	Size        uint32
+	SizeAlltime uint32
+	LastUpdate  int64 // UNIX timestamp
+	CreatedAt   int64
 }
 
 func (n NotesInfo) String() string {
-	return fmt.Sprintf("%v,%v,%v", info.NotesQuant, info.LastUpdate, info.CreatedAt)
+	return fmt.Sprintf("%v,%v,%v", n.Size, n.LastUpdate, n.CreatedAt)
 }
 
 func (n *NotesInfo) Add() {
-	n.NotesQuant++
+	n.SizeAlltime++
+	n.Size++
 }
 
 func (n *NotesInfo) Remove() {
-	n.NotesQuant--
+	n.Size--
 }
 
 func (n *NotesInfo) Save() {
@@ -41,7 +43,6 @@ func (n *NotesInfo) Save() {
 	defer f.Close()
 
 	_, err = f.WriteString(n.String())
-
 	if err != nil {
 		panic(fmt.Sprintf("%v%v", "something went wrong while writing into the info file!: ", err.Error()))
 	}
@@ -78,8 +79,10 @@ func createInfoFile(filename string) (*NotesInfo, error) {
 		defer f.Close()
 		// write basic info
 		notesInfo := NotesInfo{}
-		content := fmt.Sprintf("%v,%v,%v", notesInfo.NotesQuant, notesInfo.LastUpdate, notesInfo.CreatedAt)
-		f.WriteString(content)
+		err = binary.Write(f, binary.BigEndian, &notesInfo)
+		if err != nil {
+			return nil, fmt.Errorf("unable to write data into info file: %w", err)
+		}
 	}
 
 	// assign to the global object
@@ -97,41 +100,10 @@ func GetKeepFilePath() (string, error) {
 
 // parse content of given file as keep info
 func parseInfoContent(f *os.File) (NotesInfo, error) {
-	var (
-		notesInfo NotesInfo
-		content   string
-	)
+	var notesInfo NotesInfo
 
-	s := bufio.NewScanner(f)
-
-	if s.Scan() {
-		content = s.Text()
-	} else {
-		return notesInfo, fmt.Errorf("info file is empty: %w", ErrMalformatedFile)
-	}
-
-	segs := strings.Split(content, ",")
-	if len(segs) != 3 {
-		return notesInfo, fmt.Errorf("info file is malformated - too few segments for splitting")
-	}
-	countStr, lastUpdateStr, createdAtStr := segs[0], segs[1], segs[2]
-
-	if count, err := strconv.Atoi(countStr); err != nil {
-		return notesInfo, fmt.Errorf("unable to parse notes quantity - %w", ErrMalformatedFile)
-	} else {
-		notesInfo.NotesQuant = uint32(count)
-	}
-
-	if lastUpdate, err := strconv.ParseInt(lastUpdateStr, 10, 64); err != nil {
-		return notesInfo, fmt.Errorf("unable to parse last update - %w", ErrMalformatedFile)
-	} else {
-		notesInfo.LastUpdate = lastUpdate
-	}
-
-	if createdAt, err := strconv.ParseInt(createdAtStr, 10, 64); err != nil {
-		return notesInfo, fmt.Errorf("unable to parse created at - %w", ErrMalformatedFile)
-	} else {
-		notesInfo.CreatedAt = createdAt
+	if err := binary.Read(f, binary.BigEndian, &notesInfo); err != nil {
+		return notesInfo, nil
 	}
 
 	return notesInfo, nil

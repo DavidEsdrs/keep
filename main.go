@@ -243,7 +243,7 @@ func readAll() *cobra.Command {
 				showIncreasingOrder(s)
 			}
 
-			fmt.Printf("%v notes\n", info.NotesQuant)
+			fmt.Printf("%v notes\n", info.Size)
 		},
 	}
 }
