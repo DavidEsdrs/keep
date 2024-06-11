@@ -156,11 +156,11 @@ func createGroup() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			groupName := args[0]
 			description := args[1]
-			h, err := NewNoteFile(groupName, description)
+			_, err := NewNoteFile(groupName, description)
 			if err != nil {
 				panic(err)
 			}
-			fmt.Printf("group %s created\n", string(h.Title[:]))
+			fmt.Printf("group %s created\n", groupName)
 		},
 	}
 }
