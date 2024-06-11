@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -12,10 +11,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-)
-
-var (
-	ErrUnexEOF = errors.New("keeps: unexpected EOF")
 )
 
 var (
