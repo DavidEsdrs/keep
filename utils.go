@@ -94,3 +94,8 @@ func OpenOrCreate(filename string, flag int, perm fs.FileMode) (*os.File, error)
 	}
 	return f, nil
 }
+
+func ExtractExtension(filename string) string {
+	segs := strings.Split(filename, ".")
+	return segs[len(segs)-1]
+}
