@@ -55,7 +55,7 @@ func doesFileExists(filePath string) bool {
 func createInfoFile(filename string) (*NotesInfo, error) {
 	var notesInfo NotesInfo
 
-	targetPath, err := getKeepFilePath()
+	targetPath, err := GetKeepFilePath()
 	if err != nil {
 		return &notesInfo, err
 	}
@@ -89,11 +89,8 @@ func createInfoFile(filename string) (*NotesInfo, error) {
 }
 
 // return the directory in which the files from keep must be stored
-func getKeepFilePath() (string, error) {
+func GetKeepFilePath() (string, error) {
 	homerDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
 	keepFolder := path.Join(homerDir, ".keep")
 	return keepFolder, err
 }
