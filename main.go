@@ -148,7 +148,7 @@ func readFromGroup() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			groupName := args[0]
 			if len(args) == 1 {
-				notes, err := ReadAllNotes(groupName)
+				notes, err := ReadAllNotes(groupName + ".kps")
 				if err != nil {
 					panic(err)
 				}
@@ -187,14 +187,16 @@ func readAll() *cobra.Command {
 			}
 			defer f.Close()
 
-			s := bufio.NewScanner(f)
+			// TODO: implements --desc flag
 
-			isDecreasing, _ := cmd.Flags().GetBool("desc")
+			notes, err := ReadAllNotes(filename)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
 
-			if isDecreasing {
-				showDecreasingOrder(s)
-			} else {
-				showIncreasingOrder(s)
+			for n := range notes {
+				n.Show()
 			}
 
 			fmt.Printf("%v notes\n", info.Size)
