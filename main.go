@@ -34,16 +34,14 @@ func main() {
 
 	rootCmd.AddCommand(readAll())
 	rootCmd.AddCommand(delete())
-	rootCmd.AddCommand(readSingle())
 	rootCmd.AddCommand(deleteNote())
 
 	// group
-	groupCmd := createGroup()
-	rootCmd.AddCommand(groupCmd)
+	rootCmd.AddCommand(createGroup())
 
-	groupCmd.AddCommand(readFromGroup())
-	groupCmd.AddCommand(deleteGroup())
-	groupCmd.AddCommand(readGroups())
+	rootCmd.AddCommand(deleteGroup())
+	rootCmd.AddCommand(readFromGroup())
+	rootCmd.AddCommand(readGroups())
 
 	rootCmd.PersistentFlags().Bool("desc", false, "Show the notes in decreasing order")
 
@@ -141,7 +139,7 @@ func createGroup() *cobra.Command {
 
 func readFromGroup() *cobra.Command {
 	return &cobra.Command{
-		Use:     "get [group] [id]",
+		Use:     "read [group] [id]",
 		Aliases: []string{},
 		Short:   "read notes from group",
 		Args:    cobra.RangeArgs(1, 2),
@@ -243,28 +241,6 @@ func deleteGroup() *cobra.Command {
 	}
 }
 
-func showIncreasingOrder(s *bufio.Scanner) {
-	for s.Scan() {
-		text := s.Text()
-		note := parseTextAsNote(text)
-		note.show()
-	}
-}
-
-func showDecreasingOrder(s *bufio.Scanner) {
-	var notes []note
-
-	for s.Scan() {
-		text := s.Text()
-		note := parseTextAsNote(text)
-		notes = append(notes, note)
-	}
-
-	for i := len(notes) - 1; i >= 0; i-- {
-		note.show(notes[i])
-	}
-}
-
 func delete() *cobra.Command {
 	return &cobra.Command{
 		Use:     "delete [id]",
@@ -323,49 +299,9 @@ func delete() *cobra.Command {
 	}
 }
 
-func readSingle() *cobra.Command {
-	return &cobra.Command{
-		Use:   "read [id]",
-		Short: "return a single note",
-		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			dir, err := GetKeepFilePath()
-			if err != nil {
-				panic(err)
-			}
-			file, err := OpenOrCreate(path.Join(dir, filename), os.O_CREATE|os.O_RDONLY, 0600)
-			if err != nil {
-				panic(err)
-			}
-			defer file.Close()
-
-			id, _ := strconv.ParseInt(args[0], 10, 64)
-
-			s := bufio.NewScanner(file)
-			found := false
-
-			for s.Scan() {
-				line := s.Text()
-
-				note := parseTextAsNote(line)
-
-				if note.id == id {
-					note.show()
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				fmt.Println("not found note with given id")
-			}
-		},
-	}
-}
-
 func readGroups() *cobra.Command {
 	return &cobra.Command{
-		Use:   "all",
+		Use:   "list",
 		Short: "get all groups created",
 		Run: func(cmd *cobra.Command, args []string) {
 			groups, err := GetGroups()
