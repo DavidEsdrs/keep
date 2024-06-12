@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/fatih/color"
 )
@@ -43,14 +42,6 @@ func showError(text string, errCode int) {
 	errColor := color.New(color.FgHiRed).Add(color.Bold)
 	errColor.Println(text)
 	os.Exit(errCode)
-}
-
-// generates a note with its date and color
-func generateNote(text string) string {
-	now := time.Now().UnixMilli()
-	color := randomColor()
-	id := info.SizeAlltime + 1
-	return fmt.Sprintf("%v,%v,%v,%v\n", id, now, color, text)
 }
 
 func parseTextAsNote(text string) note {
