@@ -83,16 +83,6 @@ func (n note) show() {
 	c.Println()
 }
 
-type Choose int
-
-const (
-	Unknown Choose = iota
-	Create
-	ReadSingle
-	ReadAll
-	Delete
-)
-
 const filename string = "keeps.txt"
 
 func create() *cobra.Command {
