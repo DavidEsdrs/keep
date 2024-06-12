@@ -218,7 +218,9 @@ func ReadAllNotes(filename string) (<-chan Note, error) {
 			if err != nil {
 				break
 			}
-			out <- n
+			if n.Id > 0 {
+				out <- n
+			}
 		}
 		f.Close()
 		close(out)
@@ -276,20 +278,30 @@ func DeleteNoteById(groupName string, id int64) error {
 	}
 
 	noteFilepath := path.Join(kfp, groupName+".kps")
-	f, err := os.OpenFile(noteFilepath, os.O_RDONLY, 0)
+	f, err := os.OpenFile(noteFilepath, os.O_RDWR, 0)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	_, err = f.Seek(int64(binary.Size(nfh))+int64(binary.Size(Note{}))*(id-1), io.SeekStart)
-	if err != nil {
+	if _, err = f.Seek(int64(binary.Size(nfh))+int64(binary.Size(Note{}))*(id-1), io.SeekStart); err != nil {
 		if errors.Is(err, io.EOF) {
 			return fmt.Errorf("invalid id")
 		}
 		return fmt.Errorf("invalid id %v for range: %w", id, err)
 	}
-	return binary.Write(f, binary.BigEndian, &Note{})
+
+	nfh.Size--
+
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+
+	if err := binary.Write(f, binary.BigEndian, &nfh); err != nil {
+		return err
+	}
+
+	return binary.Write(f, binary.BigEndian, &Note{Id: -1})
 }
 
 func DeleteGroup(groupName string) error {
