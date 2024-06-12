@@ -48,10 +48,9 @@ const filename string = "keeps.txt"
 
 func create() *cobra.Command {
 	return &cobra.Command{
-		Use:     "[group] [note]",
-		Aliases: []string{"create", "add"},
-		Short:   "creates a new note",
-		Args:    cobra.RangeArgs(1, 2),
+		Use:   "[group] [note]",
+		Short: "creates a new note",
+		Args:  cobra.RangeArgs(1, 2),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 1 {
 				err := CreateSingleNote(args[0])
