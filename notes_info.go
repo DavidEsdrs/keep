@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 )
 
 var (
@@ -78,7 +79,25 @@ func createInfoFile(filename string) (*NotesInfo, error) {
 		}
 		defer f.Close()
 		// write basic info
-		notesInfo := NotesInfo{}
+
+		var (
+			title       [20]rune
+			description [200]rune
+		)
+
+		copy(title[:], []rune("default"))
+		copy(description[:], []rune("this is the default note group - notes with no group given will be stored here"))
+
+		now := time.Now().UnixMilli()
+
+		notesInfo := NotesInfo{
+			Title:       title,
+			Description: description,
+			Size:        0,
+			SizeAlltime: 0,
+			LastUpdate:  now,
+			CreatedAt:   now,
+		}
 		err = binary.Write(f, binary.BigEndian, &notesInfo)
 		if err != nil {
 			return nil, fmt.Errorf("unable to write data into info file: %w", err)
