@@ -1,15 +1,12 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"os"
 	"path"
 	"strconv"
-	"time"
 
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -34,53 +31,17 @@ func main() {
 
 	rootCmd.AddCommand(readAll())
 	rootCmd.AddCommand(delete())
-	rootCmd.AddCommand(deleteNote())
+	rootCmd.AddCommand(deleteGroupOrNote())
 
 	// group
 	rootCmd.AddCommand(createGroup())
 
-	rootCmd.AddCommand(deleteGroup())
 	rootCmd.AddCommand(readFromGroup())
 	rootCmd.AddCommand(readGroups())
 
 	rootCmd.PersistentFlags().Bool("desc", false, "Show the notes in decreasing order")
 
 	rootCmd.Execute()
-}
-
-type note struct {
-	id        int64
-	text      string
-	color     color.Attribute
-	createdAt int64
-}
-
-func (n note) show() {
-	c := color.New(n.color).Add(color.Bold)
-
-	t := time.Unix(n.createdAt/1000, 0)
-
-	blue := color.New(color.BgHiBlue).Add(color.Bold)
-
-	blue.DisableColor()
-
-	blue.Print(fmt.Sprint(n.id) + " ~ ")
-
-	blue.EnableColor()
-
-	now := time.Now()
-
-	if t.Year() == now.Year() && t.Month() == now.Month() && t.Day() == now.Day() {
-		blue.Printf(" %v ", t.Local().Format(time.Kitchen))
-	} else {
-		blue.Printf(" %v ", t.Local().Format("01/02/2006"))
-	}
-
-	blue.DisableColor()
-	blue.Print(" - ")
-	blue.EnableColor()
-	c.Print(n.text)
-	c.Println()
 }
 
 const filename string = "keeps.txt"
@@ -192,50 +153,44 @@ func readAll() *cobra.Command {
 	}
 }
 
-func deleteNote() *cobra.Command {
+func deleteGroupOrNote() *cobra.Command {
 	return &cobra.Command{
 		Use:   "delete [group] [id]",
-		Short: "delete a given note within a group",
+		Short: "delete a given note within a group - if just the group name is group, the group is deleted",
 		Run: func(cmd *cobra.Command, args []string) {
-			groupName := args[0]
-			id, err := strconv.ParseInt(args[1], 10, 64)
-			if err != nil {
-				fmt.Println("invalid id given")
-				return
+			if len(args) == 2 {
+				groupName := args[0]
+				id, err := strconv.ParseInt(args[1], 10, 64)
+				if err != nil {
+					fmt.Println("invalid id given")
+					return
+				}
+				err = DeleteNoteById(groupName, id)
+				if err != nil {
+					fmt.Printf("unable to delete note %v - error: %v", id, err.Error())
+					return
+				}
+				fmt.Printf("note %v deleted", id)
+			} else if len(args) == 1 {
+				groupName := args[0]
+				err := DeleteGroup(groupName)
+				if err != nil {
+					fmt.Printf("unable to delete group %v - error: %v", groupName, err.Error())
+					return
+				}
+				fmt.Printf("group %v deleted", groupName)
+			} else {
+				panic("invalid args count")
 			}
-			err = DeleteNoteById(groupName, id)
-			if err != nil {
-				fmt.Printf("unable to delete note %v - error: %v", id, err.Error())
-				return
-			}
-			fmt.Printf("note %v deleted", id)
-		},
-	}
-}
-
-func deleteGroup() *cobra.Command {
-	return &cobra.Command{
-		Use:     "delete [group]",
-		Aliases: []string{},
-		Short:   "delete a group",
-		Run: func(cmd *cobra.Command, args []string) {
-			groupName := args[0]
-			err := DeleteGroup(groupName)
-			if err != nil {
-				fmt.Printf("unable to delete group %v - error: %v", groupName, err.Error())
-				return
-			}
-			fmt.Printf("group %v deleted", groupName)
 		},
 	}
 }
 
 func delete() *cobra.Command {
 	return &cobra.Command{
-		Use:     "delete [id]",
-		Aliases: []string{"forget", "del"},
-		Short:   "deletes a given note",
-		Args:    cobra.ExactArgs(1),
+		Use:   "remove [id]",
+		Short: "removes a given note",
+		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			dir, err := GetKeepFilePath()
 			if err != nil {
@@ -249,38 +204,10 @@ func delete() *cobra.Command {
 
 			id, _ := strconv.ParseInt(args[0], 10, 64)
 
-			s := bufio.NewScanner(file)
-			w := bufio.NewWriter(file)
-
-			var lines []string
-
-			for s.Scan() {
-				line := s.Text()
-
-				note := parseTextAsNote(line)
-
-				if note.id != id {
-					lines = append(lines, line)
-				}
+			if err := DeleteNoteById(filename, id); err != nil {
+				fmt.Println("unable to delete note with given id")
+				return
 			}
-
-			err = file.Truncate(0) // cleans the file
-
-			if err != nil {
-				panic("keeps: error while truncating file! error - " + err.Error())
-			}
-
-			_, err = file.Seek(0, 0)
-
-			if err != nil {
-				panic("keeps: error while seeking file! error - " + err.Error())
-			}
-
-			for _, l := range lines {
-				w.WriteString(fmt.Sprintf("%v\n", l))
-			}
-
-			w.Flush()
 
 			info.Remove()
 			info.Save()

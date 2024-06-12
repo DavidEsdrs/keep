@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/fatih/color"
@@ -42,34 +41,6 @@ func showError(text string, errCode int) {
 	errColor := color.New(color.FgHiRed).Add(color.Bold)
 	errColor.Println(text)
 	os.Exit(errCode)
-}
-
-func parseTextAsNote(text string) note {
-	tokensText := strings.Split(text, ",")
-
-	id, _ := strconv.ParseInt(tokensText[0], 10, 64)
-
-	date, err := strconv.ParseInt(tokensText[1], 10, 64)
-
-	if err != nil {
-		showError("invalid date", 8)
-	}
-
-	colorNumber, _ := strconv.Atoi(tokensText[2])
-	colorAttribute := color.Attribute(colorNumber)
-
-	if err != nil {
-		showError("invalid color", 8)
-	}
-
-	innerText := tokensText[3]
-
-	return note{
-		id:        id,
-		createdAt: date,
-		text:      innerText,
-		color:     colorAttribute,
-	}
 }
 
 // OpenOrCreate opens or creates the file if it doesn't exist.
