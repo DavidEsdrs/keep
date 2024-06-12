@@ -189,7 +189,7 @@ func deleteGroupOrNote() *cobra.Command {
 func delete() *cobra.Command {
 	return &cobra.Command{
 		Use:   "remove [id]",
-		Short: "removes a given note",
+		Short: "removes a given note from default file",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			dir, err := GetKeepFilePath()
