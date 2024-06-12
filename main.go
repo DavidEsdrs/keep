@@ -204,9 +204,8 @@ func readAll() *cobra.Command {
 
 func deleteNote() *cobra.Command {
 	return &cobra.Command{
-		Use:     "delete [group] [id]",
-		Aliases: []string{"remind", "get"},
-		Short:   "delete a given note within a group",
+		Use:   "delete [group] [id]",
+		Short: "delete a given note within a group",
 		Run: func(cmd *cobra.Command, args []string) {
 			groupName := args[0]
 			id, err := strconv.ParseInt(args[1], 10, 64)
@@ -244,7 +243,7 @@ func deleteGroup() *cobra.Command {
 func delete() *cobra.Command {
 	return &cobra.Command{
 		Use:     "delete [id]",
-		Aliases: []string{"forget"},
+		Aliases: []string{"forget", "del"},
 		Short:   "deletes a given note",
 		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
