@@ -143,7 +143,7 @@ func AddNote(groupname string, text string) error {
 	noteFilepath := path.Join(kfp, groupname+".kps")
 	f, err := os.OpenFile(noteFilepath, os.O_RDWR, 0)
 	if err != nil {
-		return err
+		return fmt.Errorf("\"%s\" group not found", groupname)
 	}
 	defer f.Close()
 
@@ -192,7 +192,8 @@ func GetGroupHeader(groupName string) (NoteFileHeader, error) {
 	return nfh, err
 }
 
-func ReadAllNotes(groupName string) (<-chan Note, error) {
+// ReadAllNotes emits all notes stored within a .kps file
+func ReadAllNotes(filename string) (<-chan Note, error) {
 	var (
 		nfh NoteFileHeader
 		out = make(chan Note)
@@ -201,10 +202,10 @@ func ReadAllNotes(groupName string) (<-chan Note, error) {
 	if err != nil {
 		return nil, err
 	}
-	noteFilepath := path.Join(kfp, groupName+".kps")
+	noteFilepath := path.Join(kfp, filename)
 	f, err := os.OpenFile(noteFilepath, os.O_RDONLY, 0)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("no group with given name")
 	}
 	_, err = f.Seek(int64(binary.Size(nfh)), io.SeekStart)
 	if err != nil {
