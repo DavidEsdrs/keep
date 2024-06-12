@@ -41,7 +41,6 @@ func main() {
 	groupCmd := createGroup()
 	rootCmd.AddCommand(groupCmd)
 
-	groupCmd.AddCommand(addNoteInGroup())
 	groupCmd.AddCommand(readFromGroup())
 	groupCmd.AddCommand(deleteGroup())
 	groupCmd.AddCommand(readGroups())
@@ -100,44 +99,24 @@ const filename string = "keeps.txt"
 
 func create() *cobra.Command {
 	return &cobra.Command{
-		Use:     "[input]",
+		Use:     "[group] [note]",
 		Aliases: []string{"create", "add"},
 		Short:   "creates a new note",
-		Args:    cobra.RangeArgs(1, 10),
+		Args:    cobra.RangeArgs(1, 2),
 		Run: func(cmd *cobra.Command, args []string) {
-			dir, err := GetKeepFilePath()
-			if err != nil {
-				panic(err)
-			}
-			f, err := OpenOrCreate(path.Join(dir, filename), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
-			if err != nil {
-				panic(err)
-			}
-			defer f.Close()
-
-			w := bufio.NewWriter(f)
-
-			for _, note := range args {
-				if len(note) <= 100 {
-					note = generateNote(note)
-					n, err := w.WriteString(note)
-					if err != nil {
-						panic("error while writing: " + err.Error())
-					}
-					if n == 0 {
-						fmt.Println("no data written with no error")
-					}
-					info.Add()
-				} else {
-					showError("the length of the note is bigger than allowed!", 10)
+			if len(args) == 1 {
+				err := CreateSingleNote(args[0])
+				if err != nil {
+					fmt.Println(err)
 				}
+			} else if len(args) == 2 {
+				err := AddNote(args[0], args[1])
+				if err != nil {
+					fmt.Println(err)
+				}
+			} else {
+				panic("invalid args length")
 			}
-
-			err = w.Flush()
-			if err != nil {
-				panic("error while flushing! " + err.Error())
-			}
-			info.Save()
 		},
 	}
 }
@@ -156,26 +135,6 @@ func createGroup() *cobra.Command {
 				panic(err)
 			}
 			fmt.Printf("group %s created\n", groupName)
-		},
-	}
-}
-
-func addNoteInGroup() *cobra.Command {
-	return &cobra.Command{
-		Use:     "add [group] [message]",
-		Aliases: []string{},
-		Short:   "adds note in group",
-		Args:    cobra.ExactArgs(2),
-		Run: func(cmd *cobra.Command, args []string) {
-			h, err := GetGroupHeader(args[0])
-			if err != nil {
-				panic(err)
-			}
-			n := NewNote(int64(h.SizeAlltime+1), args[1], randomColor(), time.Now().UnixMilli())
-			err = AddNote(args[0], &n)
-			if err != nil {
-				fmt.Println(err)
-			}
 		},
 	}
 }

@@ -132,36 +132,46 @@ func NewNoteFile(title, description string) (NoteFileHeader, error) {
 	return nfh, err
 }
 
-func AddNote(filename string, n *Note) error {
+func AddNote(groupname string, text string) error {
 	var nfh NoteFileHeader
+
 	kfp, err := GetKeepFilePath()
 	if err != nil {
 		return err
 	}
-	noteFilepath := path.Join(kfp, filename+".kps")
+
+	noteFilepath := path.Join(kfp, groupname+".kps")
 	f, err := os.OpenFile(noteFilepath, os.O_RDWR, 0)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
+
 	err = binary.Read(f, binary.BigEndian, &nfh)
 	if err != nil {
 		return err
 	}
+
 	_, err = f.Seek(0, io.SeekEnd)
 	if err != nil {
 		return err
 	}
-	err = binary.Write(f, binary.BigEndian, n)
+
+	note := NewNote(int64(nfh.SizeAlltime)+1, text, randomColor(), time.Now().UnixMilli())
+
+	err = binary.Write(f, binary.BigEndian, &note)
 	if err != nil {
 		return err
 	}
+
 	nfh.Size++
 	nfh.SizeAlltime++
+
 	_, err = f.Seek(0, io.SeekStart)
 	if err != nil {
 		return err
 	}
+
 	err = binary.Write(f, binary.BigEndian, &nfh)
 	return err
 }
@@ -339,4 +349,49 @@ func GetKpsHeader(filename string) (NoteFileHeader, error) {
 		return header, fmt.Errorf("unable to read file header: %w", err)
 	}
 	return header, nil
+}
+
+func CreateSingleNote(text string) error {
+	var nfh NoteFileHeader
+	kfp, err := GetKeepFilePath()
+	if err != nil {
+		return err
+	}
+
+	noteFilepath := path.Join(kfp, filename+".kps")
+	f, err := os.OpenFile(noteFilepath, os.O_RDWR, 0)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if err := binary.Read(f, binary.BigEndian, &nfh); err != nil {
+		return err
+	}
+
+	if _, err := f.Seek(0, io.SeekEnd); err != nil {
+		return err
+	}
+
+	note := NewNote(int64(nfh.SizeAlltime)+1, text, randomColor(), time.Now().UnixMilli())
+
+	if err := binary.Write(f, binary.BigEndian, &note); err != nil {
+		return err
+	}
+
+	nfh.Size++
+	nfh.SizeAlltime++
+
+	if _, err = f.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+
+	if err := binary.Write(f, binary.BigEndian, &nfh); err != nil {
+		return err
+	}
+
+	info.Add()
+	info.Save()
+
+	return nil
 }
