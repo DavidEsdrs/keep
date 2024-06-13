@@ -2,25 +2,19 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path"
 	"strconv"
 
+	"github.com/DavidEsdrs/keep/common"
+	"github.com/DavidEsdrs/keep/configs"
+	"github.com/DavidEsdrs/keep/notes"
+	"github.com/DavidEsdrs/keep/utils"
 	"github.com/spf13/cobra"
 )
 
-var (
-	info         *NotesInfo
-	InfoFilename string = "info.kps"
-)
-
 func init() {
-	_, err := createInfoFile(InfoFilename)
-
-	if err != nil {
-		log.Fatal(err.Error())
-	}
+	configs.GetDefaultGroupState() // starts default notes file when needed
 }
 
 func main() {
@@ -44,8 +38,6 @@ func main() {
 	rootCmd.Execute()
 }
 
-const filename string = "keeps.txt"
-
 func create() *cobra.Command {
 	return &cobra.Command{
 		Use:   "[group] [note]",
@@ -53,12 +45,12 @@ func create() *cobra.Command {
 		Args:  cobra.RangeArgs(1, 2),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 1 {
-				err := CreateSingleNote(args[0])
+				err := notes.CreateSingleNote(args[0])
 				if err != nil {
 					fmt.Println(err)
 				}
 			} else if len(args) == 2 {
-				err := AddNote(args[0], args[1])
+				err := notes.AddNote(args[0], args[1])
 				if err != nil {
 					fmt.Println(err)
 				}
@@ -78,7 +70,7 @@ func createGroup() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			groupName := args[0]
 			description := args[1]
-			_, err := NewNoteFile(groupName, description)
+			_, err := notes.NewNoteFile(groupName, description)
 			if err != nil {
 				panic(err)
 			}
@@ -96,7 +88,7 @@ func readFromGroup() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			groupName := args[0]
 			if len(args) == 1 {
-				notes, err := ReadAllNotes(groupName + ".kps")
+				notes, err := notes.ReadAllNotes(groupName + ".kps")
 				if err != nil {
 					panic(err)
 				}
@@ -108,7 +100,7 @@ func readFromGroup() *cobra.Command {
 				if err != nil {
 					fmt.Println("id is not a valid number")
 				}
-				note, err := GetNoteById(groupName, id)
+				note, err := notes.GetNoteById(groupName, id)
 				if err != nil {
 					fmt.Println(err.Error())
 					return
@@ -125,11 +117,11 @@ func readAll() *cobra.Command {
 		Aliases: []string{"remind", "get"},
 		Short:   "remind you all notes",
 		Run: func(cmd *cobra.Command, args []string) {
-			dir, err := GetKeepFilePath()
+			dir, err := utils.GetKeepFilePath()
 			if err != nil {
 				panic(err)
 			}
-			f, err := OpenOrCreate(path.Join(dir, filename), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
+			f, err := utils.OpenOrCreate(path.Join(dir, common.DEFAULT_KEEP_FILE_PATH), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
 			if err != nil {
 				panic("can't manage to open file! did you deleted it? error: " + err.Error())
 			}
@@ -137,7 +129,7 @@ func readAll() *cobra.Command {
 
 			// TODO: implements --desc flag
 
-			notes, err := ReadAllNotes(filename)
+			notes, err := notes.ReadAllNotes(common.DEFAULT_KEEP_FILE_PATH)
 			if err != nil {
 				fmt.Println(err)
 				return
@@ -146,6 +138,8 @@ func readAll() *cobra.Command {
 			for n := range notes {
 				n.Show()
 			}
+
+			info := configs.GetDefaultGroupState()
 
 			fmt.Printf("%v notes\n", info.Size)
 		},
@@ -164,7 +158,7 @@ func deleteGroupOrNote() *cobra.Command {
 					fmt.Println("invalid id given")
 					return
 				}
-				err = DeleteNoteById(groupName, id)
+				err = notes.DeleteNoteById(groupName, id)
 				if err != nil {
 					fmt.Printf("unable to delete note %v - error: %v", id, err.Error())
 					return
@@ -172,7 +166,7 @@ func deleteGroupOrNote() *cobra.Command {
 				fmt.Printf("note %v deleted", id)
 			} else if len(args) == 1 {
 				groupName := args[0]
-				err := DeleteGroup(groupName)
+				err := notes.DeleteGroup(groupName)
 				if err != nil {
 					fmt.Printf("unable to delete group %v - error: %v", groupName, err.Error())
 					return
@@ -191,11 +185,11 @@ func delete() *cobra.Command {
 		Short: "removes a given note from default file",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			dir, err := GetKeepFilePath()
+			dir, err := utils.GetKeepFilePath()
 			if err != nil {
 				panic(err)
 			}
-			file, err := OpenOrCreate(path.Join(dir, filename), os.O_CREATE|os.O_RDWR, 0600)
+			file, err := utils.OpenOrCreate(path.Join(dir, common.DEFAULT_KEEP_FILE_PATH), os.O_CREATE|os.O_RDWR, 0600)
 			if err != nil {
 				panic(err)
 			}
@@ -203,10 +197,12 @@ func delete() *cobra.Command {
 
 			id, _ := strconv.ParseInt(args[0], 10, 64)
 
-			if err := DeleteNoteById(filename, id); err != nil {
+			if err := notes.DeleteNoteById(common.DEFAULT_KEEP_FILE_PATH, id); err != nil {
 				fmt.Println("unable to delete note with given id")
 				return
 			}
+
+			info := configs.GetDefaultGroupState()
 
 			info.Remove()
 			info.Save()
@@ -219,7 +215,7 @@ func readGroups() *cobra.Command {
 		Use:   "list",
 		Short: "get all groups created",
 		Run: func(cmd *cobra.Command, args []string) {
-			groups, err := GetGroups()
+			groups, err := notes.GetGroups()
 			if err != nil {
 				fmt.Println(err.Error())
 				return
