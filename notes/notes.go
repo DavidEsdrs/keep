@@ -25,7 +25,7 @@ type NoteFileHeader struct {
 }
 
 func (n *NoteFileHeader) Show() {
-	c := color.New(color.BgHiWhite).Add(color.Bold)
+	c := color.New(color.FgHiWhite).Add(color.Bold)
 
 	t := time.Unix(n.CreatedAt/1000, 0)
 
